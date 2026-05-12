@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import Nav from '@/components/Nav'
 
 function getClient() {
   return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -84,7 +83,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Nav />
       <div className="max-w-2xl mx-auto p-6 space-y-5">
         <h1 className="text-xl font-bold text-gray-900">내 정보</h1>
 

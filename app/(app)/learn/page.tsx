@@ -1,12 +1,10 @@
 'use client'
 import Link from 'next/link'
-import Nav from '@/components/Nav'
 import { UNITS, MISSIONS, LEVEL_INFO } from '@/data/missions'
 
 export default function LearnPage() {
   return (
     <>
-    <Nav />
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900 mb-1">단원별 학습</h1>

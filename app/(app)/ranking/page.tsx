@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import Nav from '@/components/Nav'
 import { MISSIONS } from '@/data/missions'
 
 function getClient() {
@@ -66,7 +65,6 @@ export default function RankingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Nav />
       <div className="max-w-2xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold text-gray-900">🏆 랭킹</h1>

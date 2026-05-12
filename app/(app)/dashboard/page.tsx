@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
-import Nav from '@/components/Nav'
 import { MISSIONS, UNITS, LEVEL_INFO } from '@/data/missions'
 
 function getClient() {
@@ -77,7 +76,6 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Nav />
       {/* 인사말 */}
       <div className="bg-white border-b border-gray-100 px-6 py-4">
         <h1 className="text-lg font-bold text-gray-900">안녕하세요, {profile?.name}님! 👋</h1>

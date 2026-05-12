@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
-import Nav from '@/components/Nav'
 import { MISSIONS, LEVEL_INFO } from '@/data/missions'
 
 function getClient() {
@@ -85,7 +84,6 @@ export default function TeacherDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Nav />
       <div className="border-b px-6 py-4 flex items-center justify-between" style={{background:'#3730A3'}}>
         <div>
           <h1 className="text-lg font-bold text-white">안녕하세요, {profile?.name} 선생님! 👋</h1>
