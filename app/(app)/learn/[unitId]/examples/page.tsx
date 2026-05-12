@@ -20,15 +20,23 @@ export default function ExamplesPage() {
   const [role, setRole] = useState('student')
   const [editMode, setEditMode] = useState(false)
   const [pyReady, setPyReady] = useState(false)
-  const [outputs, setOutputs] = useState<Record<number, string>>({})
+  const [outputs, setOutputs] = useState<Record<number, {text:string, isError:boolean}>>({})
   const [running, setRunning] = useState<number | null>(null)
-  const [editCodes, setEditCodes] = useState<Record<number, string>>({})
+  // 수정된 코드를 상태로 관리 (원본 + 편집 내용)
+  const [codes, setCodes] = useState<Record<number, string>>({})
 
   useEffect(() => {
     getClient().auth.getUser().then(({ data: { user } }) => {
       if (user) getClient().from('profiles').select('role').eq('id', user.id).single()
         .then(({ data }) => { if (data) setRole(data.role) })
     })
+
+    // 초기 코드 세팅
+    if (content) {
+      const initial: Record<number, string> = {}
+      content.examples.forEach((ex, i) => { initial[i] = ex.code })
+      setCodes(initial)
+    }
 
     const s1 = document.createElement('script')
     s1.src = 'https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js'
@@ -39,124 +47,172 @@ export default function ExamplesPage() {
       document.head.appendChild(s2)
     }
     document.head.appendChild(s1)
-  }, [])
+  }, [content])
 
   if (!unit || !content) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-4xl mb-3">🔍</div>
-        <p className="text-gray-500">단원을 찾을 수 없어요</p>
-        <Link href="/learn" className="text-blue-600 text-sm mt-2 block">← 단원 목록으로</Link>
-      </div>
-    </div>
+    <div className="flex items-center justify-center py-20 text-gray-400">단원을 찾을 수 없어요</div>
   )
 
-  async function runExample(index: number, code: string) {
+  // 실제로 코드를 실행하는 함수
+  async function runCode(index: number) {
     if (!pyReady) return
     setRunning(index)
     const Sk = window.Sk
     let out = ''
+    const code = codes[index] || content.examples[index].code
+
     Sk.configure({
       output: (t: string) => { out += t },
-      read: (x: string) => { if (!Sk.builtinFiles?.files?.[x]) throw 'File not found: '+x; return Sk.builtinFiles.files[x] },
-      __future__: Sk.python3, execLimit: 3000
+      read: (x: string) => {
+        if (!Sk.builtinFiles?.files?.[x]) throw 'File not found: ' + x
+        return Sk.builtinFiles.files[x]
+      },
+      __future__: Sk.python3,
+      execLimit: 5000
     })
+
     try {
-      await Sk.misceval.asyncToPromise(() => Sk.importMainWithBody('<stdin>', false, code, true))
-      setOutputs(prev => ({ ...prev, [index]: out.trim() || '(출력 없음)' }))
+      await Sk.misceval.asyncToPromise(() =>
+        Sk.importMainWithBody('<stdin>', false, code, true)
+      )
+      setOutputs(prev => ({ ...prev, [index]: { text: out.trim() || '(출력 없음)', isError: false } }))
     } catch (e: any) {
-      setOutputs(prev => ({ ...prev, [index]: '오류: ' + String(e).replace(/^.*?Error:/, '') }))
+      const errMsg = String(e).replace(/^.*?Error:/, '오류:')
+      setOutputs(prev => ({ ...prev, [index]: { text: errMsg, isError: true } }))
     }
     setRunning(null)
   }
 
+  function resetCode(index: number) {
+    setCodes(prev => ({ ...prev, [index]: content.examples[index].code }))
+    setOutputs(prev => { const next = {...prev}; delete next[index]; return next })
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/learn" className="text-gray-400 hover:text-gray-600 text-sm">← 단원 목록</Link>
-            <span className="text-gray-200">|</span>
-            <span className="font-semibold text-gray-900 text-sm">단원 {unitId}: {unit.title}</span>
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
+            <Link href="/learn" className="hover:text-gray-600">단원 목록</Link>
+            <span>›</span>
+            <span>단원 {unitId}: {unit.title}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {role === 'teacher' && (
-              <button onClick={() => setEditMode(!editMode)}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${editMode ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-600'}`}>
-                {editMode ? '✏️ 편집 중' : '✏️ 교사 편집'}
-              </button>
-            )}
-            <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
-              <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
-              <Link href={`/learn/${unitId}/examples`} className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">💻 예제</Link>
-              <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
-            </div>
+          <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
+            <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
+            <span className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">💻 예제</span>
+            <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-gray-400">{pyReady ? '🟢 실행 준비됨' : '⏳ 로딩 중...'}</div>
+          {role === 'teacher' && (
+            <button onClick={() => setEditMode(!editMode)}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${editMode ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-600'}`}>
+              {editMode ? '✏️ 편집 중' : '✏️ 교사 편집'}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-gray-900 text-lg">💻 예제 코드</h2>
-          <div className="text-xs text-gray-400">
-            {pyReady ? '🟢 실행 준비됨' : '⏳ Python 로딩 중...'}
-          </div>
-        </div>
+      {content.examples.map((example, i) => {
+        const currentCode = codes[i] ?? example.code
+        const output = outputs[i]
+        const isModified = currentCode !== example.code
 
-        {content.examples.map((example, i) => {
-          const code = editCodes[i] ?? example.code
-          return (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{example.title}</h3>
-                  <p className="text-sm text-gray-400 mt-0.5">{example.description}</p>
-                </div>
-                <span className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-medium">예제 {i+1}</span>
+        return (
+          <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">{example.title}</h3>
+                <p className="text-sm text-gray-400 mt-0.5">{example.description}</p>
               </div>
-
-              <div className="p-6 space-y-4">
-                <div className="rounded-xl overflow-hidden border border-gray-100">
-                  <div className="flex items-center justify-between bg-gray-900 px-4 py-2.5">
-                    <span className="text-xs text-gray-400 font-mono">Python</span>
-                    <div className="flex gap-2">
-                      <button onClick={() => navigator.clipboard?.writeText(code)} className="text-xs text-gray-400 hover:text-white transition-colors">복사</button>
-                      <button onClick={() => runExample(i, code)} disabled={!pyReady || running === i}
-                        className="text-xs bg-teal-600 text-white px-3 py-1 rounded-md hover:bg-teal-700 disabled:opacity-50 transition-colors font-medium">
-                        {running === i ? '실행 중...' : '▶ 실행'}
-                      </button>
-                    </div>
-                  </div>
-                  {editMode ? (
-                    <textarea value={code} onChange={e => setEditCodes(prev => ({ ...prev, [i]: e.target.value }))}
-                      rows={code.split('\n').length + 1}
-                      className="w-full bg-gray-950 text-green-400 font-mono text-sm px-4 py-4 outline-none resize-none border-none"/>
-                  ) : (
-                    <pre className="bg-gray-950 text-green-400 font-mono text-sm px-4 py-4 overflow-x-auto"><code>{code}</code></pre>
-                  )}
-                </div>
-
-                {outputs[i] !== undefined && (
-                  <div className="rounded-xl border border-gray-100 overflow-hidden">
-                    <div className="bg-gray-800 px-4 py-2 text-xs text-gray-400">출력 결과</div>
-                    <pre className="bg-gray-900 text-white font-mono text-sm px-4 py-3 whitespace-pre-wrap">{outputs[i]}</pre>
-                  </div>
+              <div className="flex items-center gap-2">
+                {isModified && (
+                  <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">수정됨</span>
                 )}
-
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                  <div className="text-xs font-semibold text-amber-800 mb-1.5">💬 코드 설명</div>
-                  <p className="text-sm text-amber-700 leading-relaxed">{example.explanation}</p>
-                </div>
+                <span className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-medium">예제 {i + 1}</span>
               </div>
             </div>
-          )
-        })}
 
-        <Link href={`/learn/${unitId}/missions`}
-          className="flex items-center justify-center gap-2 py-4 bg-orange-500 text-white font-semibold rounded-2xl hover:bg-orange-600 transition-colors">
-          미션 풀러 가기 🎯
-        </Link>
-      </div>
+            <div className="p-6 space-y-4">
+              {/* 코드 에디터 */}
+              <div className="rounded-xl overflow-hidden border border-gray-100">
+                <div className="flex items-center justify-between bg-gray-900 px-4 py-2.5">
+                  <span className="text-xs text-gray-400 font-mono">Python</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => navigator.clipboard?.writeText(currentCode)}
+                      className="text-xs text-gray-400 hover:text-white transition-colors px-2">
+                      복사
+                    </button>
+                    {isModified && (
+                      <button onClick={() => resetCode(i)}
+                        className="text-xs text-gray-400 hover:text-yellow-400 transition-colors px-2">
+                        원복
+                      </button>
+                    )}
+                    <button onClick={() => runCode(i)} disabled={!pyReady || running === i}
+                      className="text-xs bg-teal-600 text-white px-3 py-1 rounded-md hover:bg-teal-700 disabled:opacity-50 transition-colors font-medium">
+                      {running === i ? '실행 중...' : '▶ 실행'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* 교사 편집 모드 OR 학생 편집 가능 textarea */}
+                {(editMode || true) ? (
+                  <textarea
+                    value={currentCode}
+                    onChange={e => setCodes(prev => ({ ...prev, [i]: e.target.value }))}
+                    rows={Math.max(currentCode.split('\n').length + 1, 5)}
+                    spellCheck={false}
+                    className="w-full bg-gray-950 text-green-400 font-mono text-sm px-4 py-4 outline-none resize-none border-none"
+                    style={{ minHeight: 120 }}
+                  />
+                ) : (
+                  <pre className="bg-gray-950 text-green-400 font-mono text-sm px-4 py-4 overflow-x-auto">
+                    <code>{currentCode}</code>
+                  </pre>
+                )}
+              </div>
+
+              {/* 실행 결과 */}
+              {output !== undefined && (
+                <div className="rounded-xl border overflow-hidden" style={{borderColor: output.isError ? '#FCA5A5' : '#D1FAE5'}}>
+                  <div className="px-4 py-2 text-xs font-semibold flex items-center gap-2"
+                    style={{background: output.isError ? '#FEF2F2' : '#F0FDF4', color: output.isError ? '#DC2626' : '#059669'}}>
+                    {output.isError ? '❌ 오류' : '✅ 실행 결과'}
+                    {isModified && !output.isError && (
+                      <span className="font-normal text-gray-400">(수정된 코드로 실행)</span>
+                    )}
+                  </div>
+                  <pre className="font-mono text-sm px-4 py-3 whitespace-pre-wrap"
+                    style={{background: output.isError ? '#FFF5F5' : '#F8FFF8', color: output.isError ? '#9B1C1C' : '#1F2937'}}>
+                    {output.text}
+                  </pre>
+                </div>
+              )}
+
+              {/* 코드 설명 */}
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <div className="text-xs font-semibold text-amber-800 mb-1.5">💬 코드 설명</div>
+                <p className="text-sm text-amber-700 leading-relaxed">{example.explanation}</p>
+              </div>
+
+              {/* 직접 수정 안내 */}
+              {!output && (
+                <p className="text-xs text-gray-400 text-center">
+                  코드를 직접 수정하고 ▶ 실행을 눌러보세요. 어떻게 바뀌는지 확인해봐요!
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      <Link href={`/learn/${unitId}/missions`}
+        className="flex items-center justify-center gap-2 py-4 bg-orange-500 text-white font-semibold rounded-2xl hover:bg-orange-600 transition-colors">
+        미션 풀러 가기 🎯
+      </Link>
     </div>
   )
 }
