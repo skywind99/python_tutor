@@ -33,7 +33,7 @@ function LoginForm() {
       if (mode === 'login') {
         const { error } = await sb.auth.signInWithPassword({ email, password })
         if (error) throw error
-        router.push('/learn')
+        router.push('/dashboard')
       } else {
         if (!name.trim()) throw new Error('이름을 입력해주세요.')
         const { data, error } = await sb.auth.signUp({
@@ -46,7 +46,7 @@ function LoginForm() {
             .select('id').eq('invite_code', inviteCode).single()
           if (cls) await sb.from('profiles').update({ class_id: cls.id }).eq('id', data.user.id)
         }
-        router.push('/learn')
+        router.push('/dashboard')
       }
     } catch (e: any) {
       setError(e.message || '오류가 발생했어요.')
