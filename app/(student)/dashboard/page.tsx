@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
+import Nav from '@/components/Nav'
 import { MISSIONS, UNITS, LEVEL_INFO } from '@/data/missions'
 
 function getClient() {
@@ -76,24 +77,11 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl">💎</div>
-          <div>
-            <h1 className="font-semibold text-gray-900">파이썬 학습실</h1>
-            <p className="text-xs text-gray-400">안녕하세요, {profile?.name}님! 🎉</p>
-          </div>
-        </div>
-        <div className="flex gap-3 items-center">
-          <Link href="/learn" className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
-            학습 시작 →
-          </Link>
-          <button onClick={async () => { await getClient().auth.signOut(); router.push('/login') }}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-            로그아웃
-          </button>
-        </div>
+      <Nav />
+      {/* 인사말 */}
+      <div className="bg-white border-b border-gray-100 px-6 py-4">
+        <h1 className="text-lg font-bold text-gray-900">안녕하세요, {profile?.name}님! 👋</h1>
+        <p className="text-sm text-gray-400 mt-0.5">오늘도 파이썬 미션에 도전해봐요 💎</p>
       </div>
 
       <div className="max-w-4xl mx-auto p-6 space-y-5">

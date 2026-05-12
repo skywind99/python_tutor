@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
+import Nav from '@/components/Nav'
 import { MISSIONS, LEVEL_INFO } from '@/data/missions'
 
 function getClient() {
@@ -84,22 +85,17 @@ export default function TeacherDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl">👨‍🏫</div>
-          <div>
-            <h1 className="font-semibold text-gray-900">교사 대시보드</h1>
-            <p className="text-xs text-gray-400">{profile?.name} 선생님</p>
-          </div>
+      <Nav />
+      <div className="border-b px-6 py-4 flex items-center justify-between" style={{background:'#3730A3'}}>
+        <div>
+          <h1 className="text-lg font-bold text-white">안녕하세요, {profile?.name} 선생님! 👋</h1>
+          <p className="text-sm mt-0.5" style={{color:'rgba(255,255,255,0.7)'}}>교사 대시보드 · 학생들의 학습 현황을 확인해보세요</p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/teacher/create-mission"
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors">
-            ✨ AI 문제 만들기
-          </Link>
-          <button onClick={async () => { await getClient().auth.signOut(); router.push('/login') }}
-            className="text-xs text-gray-400 hover:text-gray-600 px-3">로그아웃</button>
-        </div>
+        <Link href="/teacher/create-mission"
+          className="px-4 py-2 text-sm font-semibold rounded-xl transition-colors"
+          style={{background:'rgba(255,255,255,0.2)',color:'#fff'}}>
+          ✨ AI 문제 만들기
+        </Link>
       </div>
 
       <div className="max-w-5xl mx-auto p-6 space-y-5">
