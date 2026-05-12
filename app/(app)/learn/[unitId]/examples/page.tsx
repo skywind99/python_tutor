@@ -34,7 +34,7 @@ export default function ExamplesPage() {
     // 초기 코드 세팅
     if (content) {
       const initial: Record<number, string> = {}
-      content.examples.forEach((ex, i) => { initial[i] = ex.code })
+      content?.examples.forEach((ex, i) => { initial[i] = ex.code })
       setCodes(initial)
     }
 
@@ -59,7 +59,7 @@ export default function ExamplesPage() {
     setRunning(index)
     const Sk = window.Sk
     let out = ''
-    const code = codes[index] || content.examples[index].code
+    const code = codes[index] ?? (content?.examples[index]?.code || '')
 
     Sk.configure({
       output: (t: string) => { out += t },
@@ -84,7 +84,7 @@ export default function ExamplesPage() {
   }
 
   function resetCode(index: number) {
-    setCodes(prev => ({ ...prev, [index]: content.examples[index].code }))
+    setCodes(prev => ({ ...prev, [index]: content?.examples[index]?.code || '' }))
     setOutputs(prev => { const next = {...prev}; delete next[index]; return next })
   }
 
@@ -115,7 +115,7 @@ export default function ExamplesPage() {
         </div>
       </div>
 
-      {content.examples.map((example, i) => {
+      {content?.examples.map((example, i) => {
         const currentCode = codes[i] ?? example.code
         const output = outputs[i]
         const isModified = currentCode !== example.code

@@ -77,7 +77,7 @@ export default function MissionsPage() {
     }
     document.head.appendChild(s1)
 
-    // Load user + progress
+    // Load user + progress via API
     async function loadUserProgress() {
       const sb = getClient()
       const { data: { user } } = await sb.auth.getUser()
@@ -87,12 +87,11 @@ export default function MissionsPage() {
       const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).single()
       if (prof) setRole(prof.role)
 
-      // Load existing progress
-      const { data: logs } = await sb.from('mission_logs')
-        .select('mission_id, hints_used, score, passed')
-        .eq('student_id', user.id)
-
-      if (logs) {
+      // API로 진도 불러오기
+      try {
+        const res = await fetch('/api/progress')
+        const data = await res.json()
+        const logs = data.logs || []
         const passedMap: Record<number,{hints:number,score:number}> = {}
         let totalScore = 0
         logs.forEach((l: any) => {
@@ -105,9 +104,8 @@ export default function MissionsPage() {
         setScore(totalScore)
         setXp(totalScore % 1000)
         setLevel(Math.floor(totalScore / 1000) + 1)
-      }
+      } catch (e) { console.error('Load progress failed:', e) }
 
-      // Initial pile based on score
       const initialPile = Array.from({length:28}, () => GEM_TYPES[Math.floor(Math.random()*GEM_TYPES.length)])
       setPile(initialPile)
     }
@@ -158,24 +156,20 @@ export default function MissionsPage() {
     const s = calcScore(current.level, hintCount)
     const gemN = LEVEL_INFO[current.level].gemCount + (hintCount===0?5:0)
 
-    // Save to Supabase
-    if (userId) {
-      try {
-        const sb = getClient()
-        const existing = passed[current.id]
-        if (!existing || existing.score < s) {
-          await sb.from('mission_logs').upsert({
-            student_id: userId,
-            mission_id: current.id,
-            passed: true,
-            hints_used: hintCount,
-            score: s,
-            code: code,
-            attempts: 1,
-          }, { onConflict: 'student_id,mission_id' })
-        }
-      } catch (e) { console.error('Save failed:', e) }
-    }
+    // API 통해서 저장 (서버사이드 auth)
+    try {
+      await fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          missionId: current.id,
+          passed: true,
+          hintsUsed: hintCount,
+          score: s,
+          code: code
+        })
+      })
+    } catch (e) { console.error('Save failed:', e) }
 
     setPassed(p => ({...p, [current.id]: {hints: hintCount, score: s}}))
     setScore(prev => prev + s)
