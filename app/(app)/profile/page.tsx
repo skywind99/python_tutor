@@ -56,12 +56,25 @@ export default function ProfilePage() {
     if (!inviteCode.trim()) return
     const sb = getClient()
     const { data: { user } } = await sb.auth.getUser()
-    if (!user) return
-    const { data: cls } = await sb.from('classes').select('*').eq('invite_code', inviteCode.toUpperCase()).single()
-    if (!cls) { alert('초대코드를 확인해주세요.'); return }
-    await sb.from('profiles').update({ class_id: cls.id }).eq('id', user.id)
+    if (!user) { alert('로그인이 필요해요'); return }
+    
+    // 대소문자 모두 시도
+    const code = inviteCode.trim().toUpperCase()
+    const { data: cls, error: clsErr } = await sb.from('classes').select('*').eq('invite_code', code).single()
+    if (clsErr || !cls) {
+      alert('초대코드를 확인해주세요. (' + code + ')')
+      return
+    }
+    
+    const { error: updateErr } = await sb.from('profiles').update({ class_id: cls.id }).eq('id', user.id)
+    if (updateErr) {
+      alert('반 등록 실패: ' + updateErr.message)
+      return
+    }
+    
     setCurrentClass(cls)
     setInviteCode('')
+    alert('반에 성공적으로 등록됐어요!')
   }
 
   async function changePassword() {
