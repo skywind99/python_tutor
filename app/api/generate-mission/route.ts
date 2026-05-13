@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 export async function POST(req: NextRequest) {
   try {
-    const { concept, difficulty, context, unitId } = await req.json()
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) return NextResponse.json({ error: 'API 키 없음' }, { status: 500 })
+    const { concept, difficulty, context, unitId, userId } = await req.json()
+
+    // 교사 본인의 키 조회
+    let apiKey = process.env.GEMINI_API_KEY || null
+
+    if (userId) {
+      const cookieStore = await cookies()
+      const sb = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+      )
+      const { data: teacher } = await sb.from('profiles').select('gemini_key').eq('id', userId).single()
+      if (teacher?.gemini_key) apiKey = teacher.gemini_key
+    }
+
+    if (!apiKey) {
+      return NextResponse.json({ error: 'Gemini API 키를 먼저 등록해주세요.' }, { status: 503 })
+    }
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
@@ -30,12 +48,8 @@ export async function POST(req: NextRequest) {
     const text = result.response.text()
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) return NextResponse.json({ error: '생성 실패' }, { status: 500 })
-
     const mission = JSON.parse(jsonMatch[0])
-    mission.id = Date.now()
-    mission.unitId = unitId || 6
-    mission.level = Number(difficulty)
-
+    mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
     return NextResponse.json({ mission })
   } catch (err) {
     return NextResponse.json({ error: '오류 발생' }, { status: 500 })

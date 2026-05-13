@@ -208,13 +208,15 @@ export default function MissionsPage() {
           missionDesc: current.description,
           code, hintLevel: next,
           previousHints: hints.map(h=>h.text),
-          errorMsg: outputOk===false ? diffMsg : undefined
+          errorMsg: outputOk===false ? diffMsg : undefined,
+          userId: userId
         })
       })
       const data = await res.json()
       setHints(h=>[...h,{level:next,text:data.hint||current.hints[hintCount]}])
     } catch {
-      setHints(h=>[...h,{level:next,text:current.hints[hintCount]}])
+      const errText = data?.error || current.hints[hintCount] || '힌트를 불러오지 못했어요.'
+      setHints(h=>[...h,{level:next,text:errText}])
     }
     setHintCount(next); setHintLoading(false)
   }
