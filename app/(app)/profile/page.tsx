@@ -25,10 +25,14 @@ export default function ProfilePage() {
       const sb = getClient()
       const { data: { user } } = await sb.auth.getUser()
       if (!user) { router.push('/login'); return }
-      const { data: prof } = await sb.from('profiles').select('*, classes(name, invite_code)').eq('id', user.id).single()
+      const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).single()
       setProfile({ ...prof, email: user.email })
       setName(prof?.name || '')
-      setCurrentClass(prof?.classes)
+      // 반 정보 별도 조회
+      if (prof?.class_id) {
+        const { data: cls } = await sb.from('classes').select('*').eq('id', prof.class_id).single()
+        setCurrentClass(cls)
+      }
       const { data: logs } = await sb.from('mission_logs').select('*').eq('student_id', user.id)
       if (logs) {
         const passed = logs.filter((l: any) => l.passed)
