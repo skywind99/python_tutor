@@ -215,8 +215,7 @@ export default function MissionsPage() {
       const data = await res.json()
       setHints(h=>[...h,{level:next,text:data.hint||current.hints[hintCount]}])
     } catch {
-      const errText = data?.error || current.hints[hintCount] || '힌트를 불러오지 못했어요.'
-      setHints(h=>[...h,{level:next,text:errText}])
+      setHints(h=>[...h,{level:next,text:current.hints[hintCount] || '힌트를 불러오지 못했어요.'}])
     }
     setHintCount(next); setHintLoading(false)
   }
