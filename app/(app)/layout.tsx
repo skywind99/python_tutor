@@ -174,7 +174,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="h-14" />
 
       {/* 페이지 컨텐츠 */}
-      {children}
+      <div onContextMenu={(e) => {
+        // 학생은 우클릭 방지 (힌트/코드 복사 방지)
+        if (!isTeacher) e.preventDefault()
+      }}>
+        {children}
+      </div>
     </div>
   )
 }
