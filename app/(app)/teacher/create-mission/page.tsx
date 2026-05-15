@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -24,6 +25,7 @@ export default function CreateMissionPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [userId, setUserId] = useState('')
 
   // 편집 가능한 필드
   const [editTitle, setEditTitle] = useState('')
@@ -39,7 +41,7 @@ export default function CreateMissionPage() {
       const res = await fetch('/api/generate-mission', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ concept, difficulty: Number(difficulty), context, unitId: 6 })
+        body: JSON.stringify({ concept, difficulty: Number(difficulty), context, unitId: 6, userId })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -54,6 +56,11 @@ export default function CreateMissionPage() {
     }
     setGenerating(false)
   }
+
+  useEffect(() => {
+    const sb = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    sb.auth.getUser().then(({ data: { user } }) => { if (user) setUserId(user.id) })
+  }, [])
 
   const CONCEPTS = ['print() 출력', 'if/else 조건문', 'for 반복문', 'while 반복문', '함수 def', '리스트', 'random 모듈', '문자열 처리', '중첩 반복문', '복합 조건']
   const THEMES = ['급식 메뉴', '학교생활', '게임', '스포츠', 'K-pop', '요리', '여행', '환경', '우주', '동물']

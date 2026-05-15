@@ -18,10 +18,6 @@ export default function TeacherDashboard() {
   const [classInfo, setClassInfo] = useState<any>(null)
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [geminiKey, setGeminiKey] = useState('')
-  const [savedKey, setSavedKey] = useState('')
-  const [keyLoading, setKeyLoading] = useState(false)
-  const [keyMsg, setKeyMsg] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -37,10 +33,6 @@ export default function TeacherDashboard() {
       const { data: cls } = await sb.from('classes').select('*').eq('teacher_id', user.id).single()
       setClassInfo(cls)
 
-      // 저장된 Gemini 키 로드
-      if (prof?.gemini_key) {
-        setSavedKey('●'.repeat(20) + prof.gemini_key.slice(-6))
-      }
 
       if (cls) {
         const { data: studs } = await sb.from('profiles')
@@ -65,23 +57,6 @@ export default function TeacherDashboard() {
       invite_code: code
     }).select().single()
     setClassInfo(data)
-  }
-
-  async function saveGeminiKey() {
-    if (!geminiKey.trim()) return
-    setKeyLoading(true)
-    const sb = getClient()
-    const { data: { user } } = await sb.auth.getUser()
-    if (!user) return
-    const { error } = await sb.from('profiles').update({ gemini_key: geminiKey.trim() }).eq('id', user.id)
-    if (error) { setKeyMsg('저장 실패: ' + error.message) }
-    else {
-      setSavedKey('●'.repeat(20) + geminiKey.slice(-6))
-      setGeminiKey('')
-      setKeyMsg('✓ API 키가 저장됐어요!')
-      setTimeout(() => setKeyMsg(''), 3000)
-    }
-    setKeyLoading(false)
   }
 
   if (loading) return (
@@ -122,7 +97,7 @@ export default function TeacherDashboard() {
         </Link>
       </div>
 
-      <div className="max-w-5xl mx-auto p-6 space-y-5">
+      <div className="max-w-7xl mx-auto p-6 space-y-5">
         {/* 반 정보 */}
         {!classInfo ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
@@ -149,38 +124,6 @@ export default function TeacherDashboard() {
             </div>
           </div>
         )}
-
-        {/* Gemini API 키 설정 */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-xl">🔑</span>
-            <div>
-              <h2 className="font-semibold text-gray-900 text-sm">Gemini API 키 설정</h2>
-              <p className="text-xs text-gray-400 mt-0.5">학생들의 AI 힌트에 사용될 무료 Gemini API 키를 등록하세요</p>
-            </div>
-          </div>
-          {savedKey && (
-            <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-teal-50 rounded-xl text-sm">
-              <span className="text-teal-600">✓</span>
-              <span className="text-teal-700 font-mono text-xs">{savedKey}</span>
-              <span className="text-teal-500 text-xs ml-auto">등록됨</span>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)}
-              placeholder="AIzaSy... (aistudio.google.com에서 무료 발급)"
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono outline-none focus:border-indigo-400"/>
-            <button onClick={saveGeminiKey} disabled={keyLoading || !geminiKey.trim()}
-              className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-40 transition-colors whitespace-nowrap"
-              style={{background:'#4338CA'}}>
-              {keyLoading ? '저장 중...' : '저장'}
-            </button>
-          </div>
-          {keyMsg && <p className={`text-xs mt-2 ${keyMsg.startsWith('✓') ? 'text-teal-600' : 'text-red-500'}`}>{keyMsg}</p>}
-          <p className="text-xs text-gray-400 mt-2">
-            👉 <a href="https://aistudio.google.com" target="_blank" rel="noopener" className="text-indigo-500 hover:underline">aistudio.google.com</a>에서 Google 계정으로 무료 발급 가능
-          </p>
-        </div>
 
         {students.length > 0 && (
           <>

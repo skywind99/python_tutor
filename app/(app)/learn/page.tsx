@@ -5,7 +5,7 @@ import { UNITS, MISSIONS, LEVEL_INFO } from '@/data/missions'
 export default function LearnPage() {
   return (
     <>
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-gray-900 mb-1">단원별 학습</h1>
         <p className="text-sm text-gray-400">개념 설명 → 예제 → 미션 순서로 학습해요</p>

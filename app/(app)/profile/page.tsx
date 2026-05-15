@@ -15,10 +15,13 @@ export default function ProfilePage() {
   const [currentClass, setCurrentClass] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [pwCurrent, setPwCurrent] = useState('')
   const [pwNew, setPwNew] = useState('')
   const [pwMsg, setPwMsg] = useState('')
   const [stats, setStats] = useState({ missions: 0, score: 0, avgHints: 0 })
+  const [geminiKey, setGeminiKey] = useState('')
+  const [geminiSaved, setGeminiSaved] = useState('')
+  const [geminiLoading, setGeminiLoading] = useState(false)
+  const [geminiMsg, setGeminiMsg] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -28,19 +31,21 @@ export default function ProfilePage() {
       const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).single()
       setProfile({ ...prof, email: user.email })
       setName(prof?.name || '')
-      // 반 정보 별도 조회
+      if (prof?.gemini_key) setGeminiSaved('●'.repeat(20) + prof.gemini_key.slice(-6))
       if (prof?.class_id) {
         const { data: cls } = await sb.from('classes').select('*').eq('id', prof.class_id).single()
         setCurrentClass(cls)
       }
-      const { data: logs } = await sb.from('mission_logs').select('*').eq('student_id', user.id)
-      if (logs) {
-        const passed = logs.filter((l: any) => l.passed)
-        setStats({
-          missions: passed.length,
-          score: logs.reduce((s: number, l: any) => s + (l.score || 0), 0),
-          avgHints: logs.length > 0 ? Math.round(logs.reduce((s: number, l: any) => s + l.hints_used, 0) / logs.length * 10) / 10 : 0,
-        })
+      if (prof?.role === 'student') {
+        const { data: logs } = await sb.from('mission_logs').select('*').eq('student_id', user.id)
+        if (logs) {
+          const passed = logs.filter((l: any) => l.passed)
+          setStats({
+            missions: passed.length,
+            score: logs.reduce((s: number, l: any) => s + (l.score || 0), 0),
+            avgHints: logs.length > 0 ? Math.round(logs.reduce((s: number, l: any) => s + l.hints_used, 0) / logs.length * 10) / 10 : 0,
+          })
+        }
       }
     }
     load()
@@ -61,23 +66,12 @@ export default function ProfilePage() {
     const sb = getClient()
     const { data: { user } } = await sb.auth.getUser()
     if (!user) { alert('로그인이 필요해요'); return }
-    
-    // 대소문자 모두 시도
     const code = inviteCode.trim().toUpperCase()
-    const { data: cls, error: clsErr } = await sb.from('classes').select('*').eq('invite_code', code).single()
-    if (clsErr || !cls) {
-      alert('초대코드를 확인해주세요. (' + code + ')')
-      return
-    }
-    
-    const { error: updateErr } = await sb.from('profiles').update({ class_id: cls.id }).eq('id', user.id)
-    if (updateErr) {
-      alert('반 등록 실패: ' + updateErr.message)
-      return
-    }
-    
-    setCurrentClass(cls)
-    setInviteCode('')
+    const { data: cls } = await sb.from('classes').select('*').eq('invite_code', code).single()
+    if (!cls) { alert('초대코드를 확인해주세요. (' + code + ')'); return }
+    const { error } = await sb.from('profiles').update({ class_id: cls.id }).eq('id', user.id)
+    if (error) { alert('반 등록 실패: ' + error.message); return }
+    setCurrentClass(cls); setInviteCode('')
     alert('반에 성공적으로 등록됐어요!')
   }
 
@@ -86,118 +80,145 @@ export default function ProfilePage() {
     const sb = getClient()
     const { error } = await sb.auth.updateUser({ password: pwNew })
     if (error) { setPwMsg(error.message); return }
-    setPwMsg('✓ 비밀번호가 변경됐어요!')
-    setPwCurrent(''); setPwNew('')
+    setPwMsg('✓ 비밀번호가 변경됐어요!'); setPwNew('')
   }
 
-  if (!profile) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-3xl animate-bounce">💎</div>
-    </div>
-  )
+  async function saveGeminiKey() {
+    if (!geminiKey.trim()) return
+    setGeminiLoading(true)
+    const sb = getClient()
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return
+    const { error } = await sb.from('profiles').update({ gemini_key: geminiKey.trim() }).eq('id', user.id)
+    if (error) { setGeminiMsg('저장 실패: ' + error.message) }
+    else {
+      setGeminiSaved('●'.repeat(20) + geminiKey.slice(-6))
+      setGeminiKey('')
+      setGeminiMsg('✓ 키가 저장됐어요! 학생들의 AI 힌트에 이 키가 사용돼요.')
+      setTimeout(() => setGeminiMsg(''), 4000)
+    }
+    setGeminiLoading(false)
+  }
+
+  if (!profile) return <div className="flex items-center justify-center py-32"><div className="text-3xl animate-bounce">💎</div></div>
 
   const isTeacher = profile.role === 'teacher'
+  const themeColor = isTeacher ? '#4338CA' : '#2563EB'
+  const themeBg = isTeacher ? '#EEF2FF' : '#EFF6FF'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto p-6 space-y-5">
-        <h1 className="text-xl font-bold text-gray-900">내 정보</h1>
+    <div className="max-w-3xl mx-auto p-6 space-y-5">
+      <h1 className="text-xl font-bold text-gray-900">👤 내 정보</h1>
 
-        {/* 프로필 카드 */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white"
-              style={{ background: isTeacher ? '#3730A3' : '#1E40AF' }}>
-              {name?.[0] || '?'}
-            </div>
-            <div>
-              <div className="font-bold text-gray-900 text-lg">{profile.name}</div>
-              <div className="text-sm text-gray-400">{profile.email}</div>
-              <div className="text-xs mt-1 px-2 py-0.5 rounded-full inline-block font-medium"
-                style={{ background: isTeacher ? '#EEF2FF' : '#EFF6FF', color: isTeacher ? '#3730A3' : '#1E40AF' }}>
-                {isTeacher ? '👨‍🏫 교사' : '🎓 학생'}
-              </div>
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <div className="flex items-center gap-5 mb-6">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
+            style={{ background: themeColor }}>{name?.[0] || '?'}</div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-gray-900 text-lg">{profile.name}</div>
+            <div className="text-sm text-gray-400 truncate">{profile.email}</div>
+            <div className="text-xs mt-1 px-2 py-0.5 rounded-full inline-block font-medium"
+              style={{ background: themeBg, color: themeColor }}>
+              {isTeacher ? '👨‍🏫 교사' : '🎓 학생'}
             </div>
           </div>
-
-          {/* 통계 (학생만) */}
           {!isTeacher && (
-            <div className="grid grid-cols-3 gap-3 mb-6 p-4 bg-gray-50 rounded-xl">
-              <div className="text-center">
-                <div className="text-xl font-bold text-gray-900">{stats.missions}</div>
-                <div className="text-xs text-gray-400">완료 미션</div>
+            <div className="grid grid-cols-3 gap-3 text-center flex-shrink-0">
+              {[{l:'완료 미션',v:stats.missions},{l:'총점',v:stats.score.toLocaleString()},{l:'평균 힌트',v:stats.avgHints}].map(s=>(
+                <div key={s.l} className="bg-gray-50 rounded-xl p-3 min-w-16">
+                  <div className="text-lg font-bold text-gray-900">{s.v}</div>
+                  <div className="text-xs text-gray-400">{s.l}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <input value={name} onChange={e=>setName(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-gray-400"
+            placeholder="이름"/>
+          <button onClick={saveName} disabled={saving}
+            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors"
+            style={{background:themeColor}}>
+            {saved?'✓ 저장됨':saving?'...':'이름 저장'}
+          </button>
+        </div>
+      </div>
+
+      {/* 학생: 반 */}
+      {!isTeacher && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 className="font-semibold text-gray-900 mb-4">🏫 반 정보</h2>
+          {currentClass ? (
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
+              <div>
+                <div className="font-semibold text-gray-900">{currentClass.name}</div>
+                <div className="text-xs text-gray-400 mt-0.5">현재 소속 반</div>
               </div>
-              <div className="text-center">
-                <div className="text-xl font-bold text-gray-900">{stats.score.toLocaleString()}</div>
-                <div className="text-xs text-gray-400">총점</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl font-bold text-gray-900">{stats.avgHints}</div>
-                <div className="text-xs text-gray-400">평균 힌트</div>
+              <span className="text-2xl">✅</span>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">선생님께 받은 초대코드를 입력해서 반에 합류하세요.</p>
+              <div className="flex gap-2">
+                <input value={inviteCode} onChange={e=>setInviteCode(e.target.value.toUpperCase())}
+                  placeholder="초대코드 6자리" maxLength={6}
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono outline-none focus:border-gray-400 tracking-widest"/>
+                <button onClick={joinClass}
+                  className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors">참여</button>
               </div>
             </div>
           )}
+        </div>
+      )}
 
-          {/* 이름 변경 */}
-          <div className="space-y-3">
-            <label className="text-sm font-semibold text-gray-700 block">이름 변경</label>
-            <div className="flex gap-2">
-              <input value={name} onChange={e => setName(e.target.value)}
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-gray-400"/>
-              <button onClick={saveName} disabled={saving}
-                className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors"
-                style={{ background: isTeacher ? '#3730A3' : '#1E40AF' }}>
-                {saved ? '✓ 저장됨' : saving ? '저장 중...' : '저장'}
-              </button>
+      {/* 교사: Gemini 키 */}
+      {isTeacher && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-xl">🔑</div>
+            <div>
+              <h2 className="font-semibold text-gray-900">Gemini API 키 <span className="text-xs text-gray-400 font-normal">AI 힌트 · 문제 생성에 사용</span></h2>
+              <p className="text-xs text-gray-400 mt-0.5">내 반 학생들의 AI 기능에 이 키가 사용돼요</p>
             </div>
           </div>
+          {geminiSaved && (
+            <div className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-teal-50 border border-teal-200 rounded-xl">
+              <span className="text-teal-600">✓</span>
+              <span className="text-xs text-teal-700 font-mono">{geminiSaved}</span>
+              <span className="text-xs text-teal-500 ml-auto">등록됨</span>
+            </div>
+          )}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input type="password" value={geminiKey} onChange={e=>setGeminiKey(e.target.value)}
+                placeholder="AIzaSy... 새 키 입력"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono outline-none focus:border-indigo-400"/>
+              <button onClick={saveGeminiKey} disabled={geminiLoading||!geminiKey.trim()}
+                className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors whitespace-nowrap"
+                style={{background:'#4338CA'}}>
+                {geminiLoading?'저장 중...':'저장'}
+              </button>
+            </div>
+            {geminiMsg && <p className={`text-xs ${geminiMsg.startsWith('✓')?'text-teal-600':'text-red-500'}`}>{geminiMsg}</p>}
+            <p className="text-xs text-gray-400">
+              👉 <a href="https://aistudio.google.com" target="_blank" rel="noopener" className="text-indigo-500 hover:underline">aistudio.google.com</a> → Google 로그인 → Get API key → 무료 발급
+            </p>
+          </div>
         </div>
+      )}
 
-        {/* 반 정보 (학생) */}
-        {!isTeacher && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-6">
-            <h2 className="font-semibold text-gray-900 mb-4">🏫 반 정보</h2>
-            {currentClass ? (
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl">
-                <div>
-                  <div className="font-semibold text-gray-900">{currentClass.name}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">현재 소속 반</div>
-                </div>
-                <div className="text-2xl">✅</div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-500">선생님께 받은 초대코드를 입력해서 반에 합류하세요.</p>
-                <div className="flex gap-2">
-                  <input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
-                    placeholder="초대코드 6자리" maxLength={6}
-                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono outline-none focus:border-gray-400 tracking-widest"/>
-                  <button onClick={joinClass}
-                    className="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors">
-                    참여
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 비밀번호 변경 */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">🔒 비밀번호 변경</h2>
-          <div className="space-y-3">
-            <input type="password" value={pwNew} onChange={e => setPwNew(e.target.value)}
-              placeholder="새 비밀번호 (6자 이상)"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-gray-400"/>
-            {pwMsg && (
-              <p className={`text-sm ${pwMsg.startsWith('✓') ? 'text-teal-600' : 'text-red-500'}`}>{pwMsg}</p>
-            )}
-            <button onClick={changePassword}
-              className="w-full py-2.5 text-sm font-semibold text-white rounded-xl transition-colors"
-              style={{ background: isTeacher ? '#3730A3' : '#1E40AF' }}>
-              비밀번호 변경
-            </button>
-          </div>
+      {/* 비밀번호 변경 */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 className="font-semibold text-gray-900 mb-4">🔒 비밀번호 변경</h2>
+        <div className="space-y-3">
+          <input type="password" value={pwNew} onChange={e=>setPwNew(e.target.value)}
+            placeholder="새 비밀번호 (6자 이상)"
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-gray-400"/>
+          {pwMsg && <p className={`text-sm ${pwMsg.startsWith('✓')?'text-teal-600':'text-red-500'}`}>{pwMsg}</p>}
+          <button onClick={changePassword}
+            className="w-full py-2.5 text-sm font-semibold text-white rounded-xl transition-colors"
+            style={{background:themeColor}}>비밀번호 변경</button>
         </div>
       </div>
     </div>
