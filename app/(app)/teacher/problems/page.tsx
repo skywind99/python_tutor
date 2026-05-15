@@ -1,0 +1,311 @@
+'use client'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
+import Link from 'next/link'
+import { MISSIONS, UNITS, LEVEL_INFO } from '@/data/missions'
+import type { Mission } from '@/data/missions'
+
+function getClient() {
+  return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+}
+
+export default function ProblemsPage() {
+  const router = useRouter()
+  const [unitId, setUnitId] = useState(1)
+  const [logs, setLogs] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedMission, setSelectedMission] = useState<Mission | null>(null)
+  const [aiSolution, setAiSolution] = useState<Record<number, string>>({})
+  const [aiLoading, setAiLoading] = useState<number | null>(null)
+  const [userId, setUserId] = useState('')
+  const [tab, setTab] = useState<'solutions'|'ai'>('solutions')
+
+  useEffect(() => {
+    async function load() {
+      const sb = getClient()
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) { router.push('/login'); return }
+      setUserId(user.id)
+
+      const { data: prof } = await sb.from('profiles').select('role, gemini_key').eq('id', user.id).single()
+      if (prof?.role !== 'teacher') { router.push('/dashboard'); return }
+
+      const { data: cls } = await sb.from('classes').select('id').eq('teacher_id', user.id).single()
+      if (!cls) { setLoading(false); return }
+
+      // 반 학생 목록
+      const { data: studs } = await sb.from('profiles').select('id, name').eq('class_id', cls.id).eq('role', 'student')
+      setStudents(studs || [])
+
+      // 전체 미션 로그
+      if (studs?.length) {
+        const ids = studs.map((s: any) => s.id)
+        const { data: allLogs } = await sb.from('mission_logs').select('*').in('student_id', ids)
+        setLogs(allLogs || [])
+      }
+      setLoading(false)
+    }
+    load()
+  }, [router])
+
+  async function generateAiSolution(mission: Mission) {
+    setAiLoading(mission.id)
+    try {
+      const res = await fetch('/api/ai-solution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: mission.title,
+          description: mission.description,
+          expectedOutput: mission.expectedOutput,
+          tags: mission.tags,
+          userId,
+        })
+      })
+      const data = await res.json()
+      if (data.solution) setAiSolution(prev => ({ ...prev, [mission.id]: data.solution }))
+      else setAiSolution(prev => ({ ...prev, [mission.id]: data.error || '생성 실패' }))
+    } catch {
+      setAiSolution(prev => ({ ...prev, [mission.id]: '오류가 발생했어요.' }))
+    }
+    setAiLoading(null)
+  }
+
+  const unitMissions = MISSIONS.filter(m => m.unitId === unitId)
+
+  function getMissionStats(missionId: number) {
+    const mLogs = logs.filter(l => l.mission_id === missionId)
+    const passed = mLogs.filter(l => l.passed)
+    return {
+      attempts: mLogs.length,
+      passed: passed.length,
+      passRate: students.length > 0 ? Math.round((passed.length / students.length) * 100) : 0,
+      avgHints: mLogs.length > 0 ? (mLogs.reduce((s, l) => s + l.hints_used, 0) / mLogs.length).toFixed(1) : '-',
+    }
+  }
+
+  function getStudentSolutions(missionId: number) {
+    return logs
+      .filter(l => l.mission_id === missionId)
+      .map(l => ({ ...l, studentName: students.find(s => s.id === l.student_id)?.name || '알 수 없음' }))
+      .sort((a, b) => b.score - a.score)
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-gray-400">불러오는 중...</div>
+  )
+
+  return (
+    <div className="max-w-6xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">📝 문제 관리</h1>
+          <p className="text-sm text-gray-400 mt-0.5">단원별 문제 현황 · 학생 풀이 확인 · AI 풀이 생성</p>
+        </div>
+        <Link href="/teacher/create-mission"
+          className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-colors"
+          style={{ background: '#4338CA' }}>
+          ✨ AI 문제 만들기
+        </Link>
+      </div>
+
+      {/* 단원 탭 */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {UNITS.map(u => (
+          <button key={u.id} onClick={() => { setUnitId(u.id); setSelectedMission(null) }}
+            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              unitId === u.id
+                ? 'text-white shadow-sm'
+                : 'bg-white border border-gray-100 text-gray-500 hover:bg-gray-50'
+            }`}
+            style={unitId === u.id ? { background: '#4338CA' } : {}}>
+            {u.id}단원 · {u.title}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex gap-5">
+        {/* 미션 목록 */}
+        <div className="w-80 flex-shrink-0 space-y-3">
+          {unitMissions.map(mission => {
+            const stats = getMissionStats(mission.id)
+            const lv = LEVEL_INFO[mission.level as 1|2|3]
+            const isSelected = selectedMission?.id === mission.id
+
+            return (
+              <div key={mission.id}
+                onClick={() => { setSelectedMission(isSelected ? null : mission); setTab('solutions') }}
+                className={`bg-white rounded-2xl border p-4 cursor-pointer transition-all ${
+                  isSelected ? 'border-indigo-300 shadow-md' : 'border-gray-100 hover:border-gray-200'
+                }`}>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: lv.bg, color: lv.text }}>{lv.label}</span>
+                    <h3 className="font-semibold text-gray-900 text-sm mt-1.5">{mission.title}</h3>
+                    <p className="text-xs text-gray-400">{mission.topic}</p>
+                  </div>
+                  <div className="text-right ml-3 flex-shrink-0">
+                    <div className="text-lg font-bold" style={{ color: '#4338CA' }}>{stats.passRate}%</div>
+                    <div className="text-xs text-gray-400">통과율</div>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+                  <div className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${stats.passRate}%`,
+                      background: stats.passRate >= 70 ? '#10B981' : stats.passRate >= 40 ? '#F59E0B' : '#EF4444'
+                    }} />
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-400">
+                  <span>시도 {stats.attempts}회</span>
+                  <span>통과 {stats.passed}명/{students.length}명</span>
+                  <span>힌트 평균 {stats.avgHints}개</span>
+                </div>
+              </div>
+            )
+          })}
+
+          {students.length === 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
+              <div className="text-3xl mb-2">👥</div>
+              <p className="text-sm text-gray-500">아직 반에 학생이 없어요</p>
+            </div>
+          )}
+        </div>
+
+        {/* 상세 패널 */}
+        {selectedMission && (
+          <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            {/* 헤더 */}
+            <div className="px-6 py-4 border-b border-gray-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-gray-900">{selectedMission.title}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{selectedMission.topic}</p>
+                </div>
+                <button onClick={() => setSelectedMission(null)} className="text-gray-300 hover:text-gray-500 text-xl">×</button>
+              </div>
+              {/* 탭 */}
+              <div className="flex gap-1 mt-3">
+                {(['solutions', 'ai'] as const).map(t => (
+                  <button key={t} onClick={() => setTab(t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      tab === t ? 'text-white' : 'text-gray-400 hover:bg-gray-50'
+                    }`}
+                    style={tab === t ? { background: '#4338CA' } : {}}>
+                    {t === 'solutions' ? `📋 학생 풀이 (${getStudentSolutions(selectedMission.id).length})` : '🤖 AI 풀이'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 학생 풀이 탭 */}
+            {tab === 'solutions' && (
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+                {getStudentSolutions(selectedMission.id).length === 0 ? (
+                  <div className="p-10 text-center text-gray-400">
+                    <div className="text-4xl mb-3">📝</div>
+                    <p className="text-sm">아직 이 문제를 시도한 학생이 없어요</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {getStudentSolutions(selectedMission.id).map((sol, i) => (
+                      <div key={i} className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
+                              style={{ background: '#4338CA' }}>
+                              {sol.studentName?.[0] || '?'}
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                  sol.passed ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-400'
+                                }`}>{sol.passed ? '✓ 통과' : '미통과'}</span>
+                                <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
+                                <span className="text-xs text-gray-400">시도 {sol.attempts}회</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-gray-900">{sol.score}점</div>
+                          </div>
+                        </div>
+                        {sol.code && (
+                          <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
+                            <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI 풀이 탭 */}
+            {tab === 'ai' && (
+              <div className="p-6">
+                <div className="mb-4">
+                  <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                    <div className="text-xs font-semibold text-gray-500 mb-2">문제 설명</div>
+                    <pre className="text-sm text-gray-600 whitespace-pre-wrap font-sans leading-relaxed">
+                      {selectedMission.description}
+                    </pre>
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="text-xs font-semibold text-gray-500 mb-1">예상 출력</div>
+                      <pre className="text-xs text-gray-500 font-mono">{selectedMission.expectedOutput}</pre>
+                    </div>
+                  </div>
+
+                  {!aiSolution[selectedMission.id] ? (
+                    <button onClick={() => generateAiSolution(selectedMission)}
+                      disabled={aiLoading === selectedMission.id}
+                      className="w-full py-3 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors"
+                      style={{ background: '#4338CA' }}>
+                      {aiLoading === selectedMission.id ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="animate-spin">⟳</span> AI가 풀이를 생성 중...
+                        </span>
+                      ) : '🤖 AI 모범 풀이 생성하기'}
+                    </button>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-semibold text-gray-500">AI 모범 풀이</div>
+                        <button onClick={() => setAiSolution(prev => { const n = {...prev}; delete n[selectedMission.id]; return n })}
+                          className="text-xs text-gray-400 hover:text-gray-600">다시 생성</button>
+                      </div>
+                      <div className="bg-gray-950 rounded-xl p-4">
+                        <pre className="text-sm text-green-400 font-mono whitespace-pre-wrap">
+                          {aiSolution[selectedMission.id]}
+                        </pre>
+                      </div>
+                      <button onClick={() => navigator.clipboard?.writeText(aiSolution[selectedMission.id])}
+                        className="mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                        📋 클립보드에 복사
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!selectedMission && students.length > 0 && (
+          <div className="flex-1 bg-white rounded-2xl border border-gray-100 flex items-center justify-center">
+            <div className="text-center text-gray-400">
+              <div className="text-4xl mb-3">👈</div>
+              <p className="text-sm">문제를 클릭하면<br/>학생 풀이와 AI 풀이를 볼 수 있어요</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
