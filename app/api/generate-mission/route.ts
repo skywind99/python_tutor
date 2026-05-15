@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
 
     const prompt = `너는 고등학교 파이썬 교육 전문가야. 다음 JSON 형식으로만 답해줘. 다른 말 하지 마.
 
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ mission })
   } catch (err: any) {
     console.error('generate-mission error:', err)
+    if (err?.status === 429) return NextResponse.json({ error: 'AI 일일 한도 초과. 내일 다시 시도하거나 API 키를 확인해주세요.' }, { status: 429 })
     return NextResponse.json({ error: err?.message || '오류가 발생했어요. 다시 시도해주세요.' }, { status: 500 })
   }
 }
