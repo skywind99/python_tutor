@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
     const levelInstructions: Record<number,string> = {
       1: '방향만 살짝 암시해줘. 질문 형식으로. 절대 코드 보여주지 마.',
