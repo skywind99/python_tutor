@@ -259,7 +259,7 @@ export default function CustomMissionPage() {
             <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
               {chatMessages.length === 0 && !hintLoading && (
                 <div className="flex flex-col items-center justify-center h-full gap-2">
-                  <div style={{ width: 80, height: 80 }}>
+                  <div style={{ width: 120, height: 120 }}>
                     <DotLottie src="/lottie/animation/Live chatbot.lottie" loop autoplay />
                   </div>
                   <p className="text-xs text-center" style={{ color: '#9ca3af' }}>AI 튜터에게 질문하거나<br />코드를 분석 받아보세요!</p>

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: 'API 키를 먼저 등록해주세요.' }, { status: 503 })
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
     const prompt = `다음 파이썬 문제의 모범 풀이 코드를 작성해줘. 코드만 작성하고, 각 줄에 간단한 한국어 주석을 달아줘.
 
@@ -46,7 +46,8 @@ ${expectedOutput}
       .replace(/```python/g, '').replace(/```/g, '').trim()
 
     return NextResponse.json({ solution })
-  } catch (err) {
-    return NextResponse.json({ error: '풀이 생성에 실패했어요.' }, { status: 500 })
+  } catch (err: any) {
+    console.error('[ai-solution]', err)
+    return NextResponse.json({ error: err?.message || '풀이 생성에 실패했어요.' }, { status: 500 })
   }
 }

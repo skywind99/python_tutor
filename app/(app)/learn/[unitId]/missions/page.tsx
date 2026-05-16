@@ -76,6 +76,9 @@ export default function MissionsPage() {
 
   const [showSuccessLottie, setShowSuccessLottie] = useState(false)
   const [showErrorLottie, setShowErrorLottie] = useState(false)
+  const [solutionCode, setSolutionCode] = useState('')
+  const [solutionLoading, setSolutionLoading] = useState(false)
+  const [showSolution, setShowSolution] = useState(false)
 
   useEffect(() => {
     const s1 = document.createElement('script')
@@ -128,6 +131,31 @@ export default function MissionsPage() {
   const changeMission = (m: Mission) => {
     setCurrent(m); setCode(m.template); setOutput(''); setOutputOk(null)
     setDiffMsg(''); setTestResults([]); setChatMessages([]); setChatInput(''); setHintCount(0)
+    setSolutionCode(''); setShowSolution(false)
+  }
+
+  const fetchSolution = async () => {
+    if (solutionLoading) return
+    if (solutionCode) { setShowSolution(s => !s); return }
+    setSolutionLoading(true)
+    try {
+      const res = await fetch('/api/ai-solution', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: current.title,
+          description: current.description,
+          expectedOutput: current.expectedOutput,
+          tags: current.tags,
+          userId,
+        })
+      })
+      const data = await res.json()
+      if (data.solution) { setSolutionCode(data.solution); setShowSolution(true) }
+      else setSolutionCode(data.error || '생성 실패')
+    } catch {
+      setSolutionCode('오류가 발생했어요.')
+    }
+    setSolutionLoading(false)
   }
 
   const scrollToBottom = useCallback(() => {
@@ -399,7 +427,7 @@ export default function MissionsPage() {
             <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
               {chatMessages.length === 0 && !hintLoading && (
                 <div className="flex flex-col items-center justify-center h-full gap-2">
-                  <div style={{width:80,height:80}}>
+                  <div style={{width:120,height:120}}>
                     <DotLottie src="/lottie/animation/Live chatbot.lottie" loop autoplay />
                   </div>
                   <p className="text-xs text-center" style={{color:'#9ca3af'}}>AI 튜터에게 질문하거나<br/>코드를 분석 받아보세요!</p>
@@ -506,13 +534,26 @@ export default function MissionsPage() {
                 <span className="text-xs font-bold" style={{color:'#f85149'}}>✗ 아직 아니에요</span>
               )}
               {showErrorLottie && (
-                <div className="ml-auto" style={{width:40,height:40}}>
+                <div style={{width:40,height:40}}>
                   <DotLottie src="/lottie/animation/Cat Crying emojiSticker animation.lottie" loop autoplay />
                 </div>
+              )}
+              {role === 'teacher' && (
+                <button onClick={fetchSolution} disabled={solutionLoading}
+                  className="ml-auto text-xs px-3 py-1 rounded-lg font-medium transition-all disabled:opacity-40"
+                  style={{background: showSolution ? 'rgba(31,111,235,0.3)' : 'rgba(255,255,255,0.07)', color: showSolution ? '#58a6ff' : '#8b949e'}}>
+                  {solutionLoading ? '⟳ 생성 중...' : showSolution ? '✕ 풀이 닫기' : '🔍 모범 풀이'}
+                </button>
               )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
+              {showSolution && solutionCode && (
+                <div className="mb-3 rounded-xl overflow-hidden" style={{border:'1px solid rgba(31,111,235,0.4)'}}>
+                  <div className="px-3 py-1.5 text-xs font-semibold" style={{background:'rgba(31,111,235,0.15)',color:'#58a6ff'}}>🤖 AI 모범 풀이</div>
+                  <pre className="p-3 text-xs font-mono whitespace-pre-wrap leading-relaxed" style={{color:'#c9d1d9'}}>{solutionCode}</pre>
+                </div>
+              )}
               {testResults.length > 0 ? (
                 <div className="space-y-2">
                   {testResults.map((r, i) => (
