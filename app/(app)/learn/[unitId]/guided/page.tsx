@@ -35,7 +35,7 @@ export default function GuidedPage() {
     parts.forEach((part, i) => {
       if (part) {
         elements.push(
-          <span key={`txt-${i}`} className="font-mono text-sm whitespace-pre">
+          <span key={`txt-${i}`} className="font-mono text-sm whitespace-pre text-green-400">
             {part}
           </span>
         )
