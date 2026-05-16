@@ -17,6 +17,7 @@ export default function StudentDashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [logs, setLogs] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
+  const [customMissions, setCustomMissions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -40,6 +41,11 @@ export default function StudentDashboard() {
           .eq('role', 'student')
         setRanking(rank || [])
       }
+      // 선생님이 추가한 문제
+      const cmRes = await fetch('/api/custom-missions')
+      const cmData = await cmRes.json()
+      setCustomMissions(cmData.missions || [])
+
       setLoading(false)
     }
     load()
@@ -181,6 +187,37 @@ export default function StudentDashboard() {
             )}
           </div>
         </div>
+
+        {/* 선생님 추가 문제 */}
+        {customMissions.length > 0 && (
+          <div className="bg-white rounded-2xl border border-indigo-100 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="font-semibold text-gray-800 text-sm">✨ 선생님이 추가한 문제</h2>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-500 font-medium">{customMissions.length}개</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {customMissions.map((m: any) => {
+                const levelLabel = ['', '기초', '응용', '심화'][m.level] || '응용'
+                const levelColor = [, '#DBEAFE #2563EB', '#FEF3C7 #D97706', '#FCE7F3 #DB2777'][m.level]
+                const [bg, color] = (levelColor || '#F3F4F6 #6B7280').split(' ')
+                return (
+                  <Link key={m.id} href={`/custom-mission/${m.id}`}
+                    className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all group">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">✨</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">{m.title}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: bg, color }}>{levelLabel}</span>
+                        <span className="text-xs text-gray-400 truncate">{m.topic}</span>
+                      </div>
+                    </div>
+                    <span className="text-gray-300 group-hover:text-indigo-400 transition-colors text-sm mt-1">→</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 최근 활동 */}
         {logs.length > 0 && (
