@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       hints: mission.hints || [],
       needs_input: mission.needsInput || false,
       default_input: mission.defaultInput || '',
+      unit_id: mission.unitId || null,
     }).select().single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
@@ -21,6 +21,15 @@ export default function ProblemsPage() {
   const [aiLoading, setAiLoading] = useState<number | null>(null)
   const [userId, setUserId] = useState('')
   const [tab, setTab] = useState<'solutions'|'ai'>('solutions')
+  const [customMissions, setCustomMissions] = useState<any[]>([])
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [movingId, setMovingId] = useState<string | null>(null)
+
+  const loadCustomMissions = useCallback(async () => {
+    const res = await fetch('/api/custom-missions')
+    const data = await res.json()
+    setCustomMissions(data.missions || [])
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -35,11 +44,9 @@ export default function ProblemsPage() {
       const { data: cls } = await sb.from('classes').select('id').eq('teacher_id', user.id).single()
       if (!cls) { setLoading(false); return }
 
-      // 반 학생 목록
       const { data: studs } = await sb.from('profiles').select('id, name').eq('class_id', cls.id).eq('role', 'student')
       setStudents(studs || [])
 
-      // 전체 미션 로그
       if (studs?.length) {
         const ids = studs.map((s: any) => s.id)
         const { data: allLogs } = await sb.from('mission_logs').select('*').in('student_id', ids)
@@ -48,7 +55,8 @@ export default function ProblemsPage() {
       setLoading(false)
     }
     load()
-  }, [router])
+    loadCustomMissions()
+  }, [router, loadCustomMissions])
 
   async function generateAiSolution(mission: Mission) {
     setAiLoading(mission.id)
@@ -73,7 +81,34 @@ export default function ProblemsPage() {
     setAiLoading(null)
   }
 
+  async function deleteCustomMission(id: string) {
+    if (!confirm('이 문제를 삭제할까요?')) return
+    setDeletingId(id)
+    try {
+      await fetch(`/api/custom-missions?id=${id}`, { method: 'DELETE' })
+      await loadCustomMissions()
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function moveCustomMission(id: string, newUnitId: number | null) {
+    setMovingId(id)
+    try {
+      await fetch(`/api/custom-missions?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unitId: newUnitId }),
+      })
+      await loadCustomMissions()
+    } finally {
+      setMovingId(null)
+    }
+  }
+
   const unitMissions = MISSIONS.filter(m => m.unitId === unitId)
+  const unitCustomMissions = customMissions.filter(m => m.unit_id === unitId)
+  const unassignedCustomMissions = customMissions.filter(m => !m.unit_id)
 
   function getMissionStats(missionId: number) {
     const mLogs = logs.filter(l => l.mission_id === missionId)
@@ -96,6 +131,10 @@ export default function ProblemsPage() {
   if (loading) return (
     <div className="flex items-center justify-center py-20 text-gray-400">불러오는 중...</div>
   )
+
+  const levelLabel = (l: number) => ['', '기초', '응용', '심화'][l] || '응용'
+  const levelBg = (l: number) => (['', '#DBEAFE', '#FEF3C7', '#FCE7F3'][l] || '#F3F4F6')
+  const levelColor = (l: number) => (['', '#2563EB', '#D97706', '#DB2777'][l] || '#6B7280')
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -129,6 +168,7 @@ export default function ProblemsPage() {
       <div className="flex gap-5">
         {/* 미션 목록 */}
         <div className="w-80 flex-shrink-0 space-y-3">
+          {/* 기본 미션 */}
           {unitMissions.map(mission => {
             const stats = getMissionStats(mission.id)
             const lv = LEVEL_INFO[mission.level as 1|2|3]
@@ -168,6 +208,46 @@ export default function ProblemsPage() {
             )
           })}
 
+          {/* 추가문제 섹션 */}
+          {unitCustomMissions.length > 0 && (
+            <div className="pt-2">
+              <div className="text-xs font-semibold text-gray-400 mb-2 px-1">✨ 선생님 추가 문제</div>
+              {unitCustomMissions.map((m: any) => (
+                <div key={m.id} className="bg-white rounded-2xl border border-indigo-100 p-3 mb-2">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded-full"
+                        style={{ background: levelBg(m.level), color: levelColor(m.level) }}>
+                        {levelLabel(m.level)}
+                      </span>
+                      <div className="text-sm font-semibold text-gray-900 mt-1 truncate">{m.title}</div>
+                      <div className="text-xs text-gray-400">{m.topic}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 mt-2">
+                    <select
+                      value={m.unit_id || ''}
+                      onChange={e => moveCustomMission(m.id, e.target.value ? Number(e.target.value) : null)}
+                      disabled={movingId === m.id}
+                      className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-indigo-300 bg-white"
+                      onClick={e => e.stopPropagation()}>
+                      <option value="">단원 미지정</option>
+                      {UNITS.map(u => (
+                        <option key={u.id} value={u.id}>{u.id}. {u.title}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => deleteCustomMission(m.id)}
+                      disabled={deletingId === m.id}
+                      className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 disabled:opacity-40 transition-colors flex-shrink-0">
+                      {deletingId === m.id ? '...' : '삭제'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {students.length === 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
               <div className="text-3xl mb-2">👥</div>
@@ -179,7 +259,6 @@ export default function ProblemsPage() {
         {/* 상세 패널 */}
         {selectedMission && (
           <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            {/* 헤더 */}
             <div className="px-6 py-4 border-b border-gray-50">
               <div className="flex items-center justify-between">
                 <div>
@@ -188,7 +267,6 @@ export default function ProblemsPage() {
                 </div>
                 <button onClick={() => setSelectedMission(null)} className="text-gray-300 hover:text-gray-500 text-xl">×</button>
               </div>
-              {/* 탭 */}
               <div className="flex gap-1 mt-3">
                 {(['solutions', 'ai'] as const).map(t => (
                   <button key={t} onClick={() => setTab(t)}
@@ -202,7 +280,6 @@ export default function ProblemsPage() {
               </div>
             </div>
 
-            {/* 학생 풀이 탭 */}
             {tab === 'solutions' && (
               <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
                 {getStudentSolutions(selectedMission.id).length === 0 ? (
@@ -247,7 +324,6 @@ export default function ProblemsPage() {
               </div>
             )}
 
-            {/* AI 풀이 탭 */}
             {tab === 'ai' && (
               <div className="p-6">
                 <div className="mb-4">
@@ -298,11 +374,49 @@ export default function ProblemsPage() {
         )}
 
         {!selectedMission && students.length > 0 && (
-          <div className="flex-1 bg-white rounded-2xl border border-gray-100 flex items-center justify-center">
-            <div className="text-center text-gray-400">
-              <div className="text-4xl mb-3">👈</div>
-              <p className="text-sm">문제를 클릭하면<br/>학생 풀이와 AI 풀이를 볼 수 있어요</p>
+          <div className="flex-1 space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 flex items-center justify-center" style={{ minHeight: '200px' }}>
+              <div className="text-center text-gray-400">
+                <div className="text-4xl mb-3">👈</div>
+                <p className="text-sm">문제를 클릭하면<br/>학생 풀이와 AI 풀이를 볼 수 있어요</p>
+              </div>
             </div>
+
+            {/* 단원 미지정 추가문제 */}
+            {unassignedCustomMissions.length > 0 && (
+              <div className="bg-white rounded-2xl border border-indigo-100 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700">✨ 단원 미지정 추가 문제</h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-500">{unassignedCustomMissions.length}개</span>
+                </div>
+                <div className="space-y-2">
+                  {unassignedCustomMissions.map((m: any) => (
+                    <div key={m.id} className="flex items-center gap-2 p-3 rounded-xl border border-gray-100">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 truncate">{m.title}</div>
+                        <div className="text-xs text-gray-400">{m.topic}</div>
+                      </div>
+                      <select
+                        value=""
+                        onChange={e => moveCustomMission(m.id, e.target.value ? Number(e.target.value) : null)}
+                        disabled={movingId === m.id}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-indigo-300 bg-white">
+                        <option value="">단원 배정...</option>
+                        {UNITS.map(u => (
+                          <option key={u.id} value={u.id}>{u.id}. {u.title}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => deleteCustomMission(m.id)}
+                        disabled={deletingId === m.id}
+                        className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 disabled:opacity-40 transition-colors">
+                        {deletingId === m.id ? '...' : '삭제'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

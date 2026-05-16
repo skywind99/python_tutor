@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
+import { UNITS } from '@/data/missions'
 
 type GeneratedMission = {
   title: string; topic: string; description: string; template: string
@@ -23,6 +24,7 @@ export default function CreateMissionPage() {
   const [concept, setConcept] = useState('')
   const [difficulty, setDifficulty] = useState('2')
   const [context, setContext] = useState('')
+  const [selectedUnit, setSelectedUnit] = useState<number | null>(null)
   const [generating, setGenerating] = useState(false)
   const [mission, setMission] = useState<GeneratedMission | null>(null)
   const [saving, setSaving] = useState(false)
@@ -53,7 +55,7 @@ export default function CreateMissionPage() {
       const res = await fetch('/api/generate-mission', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ concept, difficulty: Number(difficulty), context, unitId: 6, userId })
+        body: JSON.stringify({ concept, difficulty: Number(difficulty), context, unitId: selectedUnit || 1, userId })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -79,7 +81,15 @@ export default function CreateMissionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          mission: { ...mission, title: editTitle, description: editDesc, template: editTemplate, expectedOutput: editOutput, hints: editHints }
+          mission: {
+            ...mission,
+            title: editTitle,
+            description: editDesc,
+            template: editTemplate,
+            expectedOutput: editOutput,
+            hints: editHints,
+            unitId: selectedUnit,
+          }
         })
       })
       const data = await res.json()
@@ -115,6 +125,29 @@ export default function CreateMissionPage() {
           {/* 왼쪽: 입력 폼 */}
           <div className="space-y-5">
             <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+
+              {/* 단원 선택 */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">단원 선택 <span className="text-gray-400 font-normal">(선택)</span></label>
+                <div className="flex flex-wrap gap-1.5">
+                  {UNITS.map(u => (
+                    <button key={u.id} onClick={() => setSelectedUnit(selectedUnit === u.id ? null : u.id)}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
+                        selectedUnit === u.id
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'border-gray-200 text-gray-500 hover:border-indigo-300'
+                      }`}>
+                      {u.id}. {u.title}
+                    </button>
+                  ))}
+                </div>
+                {selectedUnit && (
+                  <p className="text-xs text-indigo-500 mt-1.5">
+                    ✓ {UNITS.find(u => u.id === selectedUnit)?.title} 단원으로 저장돼요
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="text-sm font-semibold text-gray-700 mb-2 block">파이썬 개념 *</label>
                 <input value={concept} onChange={e => setConcept(e.target.value)}

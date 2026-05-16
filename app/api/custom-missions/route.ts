@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
+
+function getAuthClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
 
 export async function GET() {
   try {
@@ -19,7 +27,6 @@ export async function GET() {
 
     let classId = prof?.class_id
 
-    // 교사인 경우 자신의 반 ID 조회
     if (prof?.role === 'teacher') {
       const { data: cls } = await sb.from('classes').select('id').eq('teacher_id', user.id).single()
       classId = cls?.id
@@ -35,5 +42,65 @@ export async function GET() {
     return NextResponse.json({ missions: missions || [] })
   } catch {
     return NextResponse.json({ missions: [] })
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'id 필요' }, { status: 400 })
+
+    const cookieStore = await cookies()
+    const sb = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll: () => cookieStore.getAll() } }
+    )
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+    const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).single()
+    if (prof?.role !== 'teacher') return NextResponse.json({ error: '교사만 삭제할 수 있어요' }, { status: 403 })
+
+    const adminSb = getAuthClient()
+    const { error } = await adminSb.from('custom_missions').delete().eq('id', id).eq('teacher_id', user.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'id 필요' }, { status: 400 })
+
+    const cookieStore = await cookies()
+    const sb = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll: () => cookieStore.getAll() } }
+    )
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
+
+    const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).single()
+    if (prof?.role !== 'teacher') return NextResponse.json({ error: '교사만 수정할 수 있어요' }, { status: 403 })
+
+    const body = await req.json()
+    const adminSb = getAuthClient()
+    const { error } = await adminSb.from('custom_missions')
+      .update({ unit_id: body.unitId ?? null })
+      .eq('id', id)
+      .eq('teacher_id', user.id)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
