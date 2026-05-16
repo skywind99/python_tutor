@@ -275,18 +275,18 @@ playlist = ["Supernova", "Love wins all", "Ditto"]
       },
       {
         id: 3,
-        type: 'fillblank',
+        type: 'multiblank',
         questTitle: '퀘스트 4-3. 자동 재생 시작!',
-        vibeText: '마지막 관문! for 루프가 playlist에서 노래를 꺼낼 때마다, 그 노래는 song 변수에 담겨요. 이제 print 안에 그 변수를 넣어서 화면에 출력해 보세요!',
+        vibeText: 'for 루프에서 노래를 꺼낼 변수 이름을 정하고, print 안에서도 그 이름을 그대로 써야 해요. 두 빈칸에 같은 변수 이름이 들어가야 한다는 게 핵심!',
         context: '출력 목표:\n🎵 지금 재생 중인 곡: Supernova\n🎵 지금 재생 중인 곡: Love wins all\n🎵 지금 재생 중인 곡: Ditto',
         codeTemplate: `playlist = ["Supernova", "Love wins all", "Ditto"]
 
-for song in playlist:
-    print("🎵 지금 재생 중인 곡:", [___])`,
-        blanks: ['song'],
-        blankLabels: ['꺼낸 노래가 담긴 변수 이름'],
-        hint: '💡 for song in playlist: 에서 꺼낸 노래는 어느 변수에 담겼나요?',
-        answer: ['song'],
+for [___1___] in playlist:
+    print("🎵 지금 재생 중인 곡:", [___2___])`,
+        blanks: ['song', 'song'],
+        blankLabels: ['변수 이름 (song)', '위와 똑같은 이름'],
+        hint: '💡 두 빈칸에 같은 단어를 넣어요. "song"처럼 노래를 뜻하는 이름이면 딱이에요!',
+        answer: ['song', 'song'],
         successMsg: '🎊 만세!! 점심시간 자동 재생 시스템 구축 완료! 최종 경험치 +500! 당신은 진정한 마스터 PD입니다!',
         xp: 500,
       },
