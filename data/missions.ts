@@ -1,5 +1,11 @@
 export type Level = 1 | 2 | 3
 
+export interface TestCase {
+  label: string
+  inputs: string[]
+  expectedOutput: string
+}
+
 export interface Mission {
   id: number
   unitId: number
@@ -15,6 +21,7 @@ export interface Mission {
   defaultInput?: string
   hints: string[]
   bonusCondition?: string
+  testCases?: TestCase[]
 }
 
 export const MISSIONS: Mission[] = [
@@ -37,10 +44,15 @@ export const MISSIONS: Mission[] = [
     id: 19, unitId: 1,
     title: "나의 프로필 카드",
     level: 1, icon: "user", topic: "변수 · print()",
-    description: `아래 변수를 활용해서\n프로필을 출력하세요.\n\n이름: 홍길동\n나이: 17살\n좋아하는 것: 파이썬`,
-    template: `name = "홍길동"\nage = 17\nhobby = "파이썬"\n\n# 아래 형식으로 출력하세요\n`,
+    description: `이름, 나이, 취미를 입력받아\n프로필 카드를 출력하세요.\n\n예시 입력: 홍길동 / 17 / 파이썬\n예시 출력:\n이름: 홍길동\n나이: 17살\n좋아하는 것: 파이썬`,
+    template: `name = input()\nage = int(input())\nhobby = input()\n\n# 아래 형식으로 출력하세요\n`,
     expectedOutput: "이름: 홍길동\n나이: 17살\n좋아하는 것: 파이썬",
-    tags: ["변수", "print", "str"], needsInput: false,
+    tags: ["변수", "print", "input", "str"], needsInput: true,
+    defaultInput: "홍길동,17,파이썬",
+    testCases: [
+      { label: "테스트 1", inputs: ["홍길동", "17", "파이썬"], expectedOutput: "이름: 홍길동\n나이: 17살\n좋아하는 것: 파이썬" },
+      { label: "테스트 2", inputs: ["김철수", "16", "축구"], expectedOutput: "이름: 김철수\n나이: 16살\n좋아하는 것: 축구" },
+    ],
     hints: [
       "💡 print()에 쉼표(,)로 여러 값을 넣으면 한 줄에 출력돼요. 변수도 그냥 넣으면 돼요.",
       '🔍 print("이름:", name) 처럼 문자열과 변수를 함께 써봐요. 숫자 뒤에 글자를 붙이려면 str()이 필요해요.',
@@ -51,10 +63,15 @@ export const MISSIONS: Mission[] = [
     id: 20, unitId: 1,
     title: "영수증 출력기",
     level: 2, icon: "receipt", topic: "변수 · str() · 문자열 연결",
-    description: `아래 변수를 활용해서\n영수증 형식으로 출력하세요.\n\n[ 분식집 영수증 ]\n메뉴: 떡볶이\n가격: 4500원\n수량: 2개\n합계: 9000원`,
-    template: `menu = "떡볶이"\nprice = 4500\nqty = 2\n\n# 영수증 형식으로 출력하세요\n`,
+    description: `메뉴명, 가격, 수량을 입력받아\n영수증을 출력하세요.\n합계 = 가격 × 수량\n\n예시 입력: 떡볶이 / 4500 / 2\n예시 출력:\n[ 분식집 영수증 ]\n메뉴: 떡볶이\n가격: 4500원\n수량: 2개\n합계: 9000원`,
+    template: `menu = input()\nprice = int(input())\nqty = int(input())\n\n# 영수증 형식으로 출력하세요\n`,
     expectedOutput: "[ 분식집 영수증 ]\n메뉴: 떡볶이\n가격: 4500원\n수량: 2개\n합계: 9000원",
-    tags: ["변수", "str", "문자열연결", "*"], needsInput: false,
+    tags: ["변수", "input", "str", "문자열연결", "*"], needsInput: true,
+    defaultInput: "떡볶이,4500,2",
+    testCases: [
+      { label: "테스트 1", inputs: ["떡볶이", "4500", "2"], expectedOutput: "[ 분식집 영수증 ]\n메뉴: 떡볶이\n가격: 4500원\n수량: 2개\n합계: 9000원" },
+      { label: "테스트 2", inputs: ["순대", "3000", "3"], expectedOutput: "[ 분식집 영수증 ]\n메뉴: 순대\n가격: 3000원\n수량: 3개\n합계: 9000원" },
+    ],
     hints: [
       "💡 total = price * qty 로 합계를 먼저 계산하고, 각 줄을 print()로 출력해요.",
       '🔍 숫자를 문자열과 합치려면 str()로 변환해야 해요. print("가격: " + str(price) + "원")',

@@ -47,6 +47,7 @@ export default function MissionsPage() {
   const [output, setOutput] = useState('')
   const [outputOk, setOutputOk] = useState<boolean|null>(null)
   const [diffMsg, setDiffMsg] = useState('')
+  const [testResults, setTestResults] = useState<{label:string;passed:boolean;actual:string;expected:string;inputs:string[]}[]>([])
   const [chatMessages, setChatMessages] = useState<{role:'ai'|'user', text:string}[]>([])
   const [chatInput, setChatInput] = useState('')
   const [hintCount, setHintCount] = useState(0)
@@ -116,7 +117,7 @@ export default function MissionsPage() {
 
   const changeMission = (m: Mission) => {
     setCurrent(m); setCode(m.template); setOutput(''); setOutputOk(null)
-    setDiffMsg(''); setChatMessages([]); setChatInput(''); setHintCount(0); setTab('output')
+    setDiffMsg(''); setTestResults([]); setChatMessages([]); setChatInput(''); setHintCount(0); setTab('output')
   }
 
   const scrollToBottom = useCallback(() => {
@@ -127,6 +128,36 @@ export default function MissionsPage() {
     if (!pyReady || running) return
     setRunning(true); setTab('output')
     const Sk = window.Sk
+
+    // 테스트 케이스가 있으면 각각 실행
+    if (current.testCases && current.testCases.length > 0) {
+      setTestResults([])
+      const results: {label:string;passed:boolean;actual:string;expected:string;inputs:string[]}[] = []
+      try {
+        for (const tc of current.testCases) {
+          let out = ''; let inputIdx = 0
+          Sk.configure({
+            output: (t: string) => { out += t },
+            read: (x: string) => { if (!Sk.builtinFiles?.files?.[x]) throw 'File not found: '+x; return Sk.builtinFiles.files[x] },
+            inputfun: () => tc.inputs[inputIdx++] ?? '',
+            inputfunTakesPrompt: true, __future__: Sk.python3, execLimit: 5000,
+          })
+          await Sk.misceval.asyncToPromise(() => Sk.importMainWithBody('<stdin>', false, code, true))
+          const actual = out.trim()
+          results.push({ label: tc.label, passed: norm(actual) === norm(tc.expectedOutput), actual, expected: tc.expectedOutput, inputs: tc.inputs })
+        }
+      } catch (e: any) {
+        setOutput(String(e).replace(/^.*?Error:/,'오류:')); setOutputOk(false); setRunning(false); return
+      }
+      setTestResults(results)
+      const allPassed = results.every(r => r.passed)
+      setOutputOk(allPassed)
+      if (allPassed && !passed[current.id]) await onPass(results[0].actual)
+      setRunning(false)
+      return
+    }
+
+    // 일반 실행 (testCases 없음)
     const inputs = (current.defaultInput || '').split(',').map((s: string) => s.trim())
     let out = ''; let inputIdx = 0
     try {
@@ -306,7 +337,28 @@ export default function MissionsPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-3">
               {tab==='output' ? (
-                output ? (
+                testResults.length > 0 ? (
+                  <div className="space-y-2">
+                    {testResults.map((r, i) => (
+                      <div key={i} className={`rounded-xl p-2.5 ${r.passed ? 'bg-teal-50' : 'bg-red-50'}`}>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className={`text-xs font-semibold ${r.passed ? 'text-teal-600' : 'text-red-500'}`}>
+                            {r.passed ? '✓' : '✗'} {r.label}
+                          </span>
+                          <span className="text-xs text-gray-400">입력: {r.inputs.join(' / ')}</span>
+                        </div>
+                        <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap">{r.actual || '(출력 없음)'}</pre>
+                        {!r.passed && (
+                          <div className="mt-1.5 pt-1.5 border-t border-red-200">
+                            <div className="text-xs text-red-400">예상:</div>
+                            <pre className="text-xs font-mono text-red-400 whitespace-pre-wrap">{r.expected}</pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {outputOk === true && <div className="text-xs text-teal-600 font-semibold text-center pt-1">🎉 모든 테스트 통과!</div>}
+                  </div>
+                ) : output ? (
                   <div>
                     <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap mb-2">{output}</pre>
                     {outputOk===true && <div className="text-xs text-teal-600 font-semibold">✓ 정답!</div>}
@@ -356,11 +408,16 @@ export default function MissionsPage() {
           <div className="flex-[3] flex flex-col min-h-0">
             <textarea value={code} onChange={e=>setCode(e.target.value)}
               className="flex-1 p-4 font-mono text-sm text-gray-800 bg-gray-50 border-none outline-none resize-none overflow-auto" spellCheck={false}/>
-            {current.needsInput && (
+            {current.needsInput && !current.testCases && (
               <div className="bg-white border-t border-gray-100 px-4 py-2 flex items-center gap-3 flex-none">
                 <span className="text-xs text-gray-400">테스트 입력</span>
                 <input className="flex-1 text-xs font-mono border border-gray-200 rounded px-2 py-1 outline-none" defaultValue={current.defaultInput}
                   onChange={e=>{(current as any)._testInput=e.target.value}}/>
+              </div>
+            )}
+            {current.testCases && (
+              <div className="bg-indigo-50 border-t border-indigo-100 px-4 py-1.5 flex items-center gap-2 flex-none">
+                <span className="text-xs text-indigo-500 font-medium">🧪 {current.testCases.length}가지 케이스로 자동 검증돼요</span>
               </div>
             )}
           </div>
