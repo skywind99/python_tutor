@@ -1,6 +1,6 @@
 'use client'
 import { useParams } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { MISSIONS, UNITS, LEVEL_INFO, calcScore } from '@/data/missions'
 import type { Mission } from '@/data/missions'
 import Link from 'next/link'
@@ -47,9 +47,11 @@ export default function MissionsPage() {
   const [output, setOutput] = useState('')
   const [outputOk, setOutputOk] = useState<boolean|null>(null)
   const [diffMsg, setDiffMsg] = useState('')
-  const [hints, setHints] = useState<{level:number,text:string}[]>([])
+  const [chatMessages, setChatMessages] = useState<{role:'ai'|'user', text:string}[]>([])
+  const [chatInput, setChatInput] = useState('')
   const [hintCount, setHintCount] = useState(0)
   const [hintLoading, setHintLoading] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<'output'|'hint'>('output')
   const [running, setRunning] = useState(false)
   const [pyReady, setPyReady] = useState(false)
@@ -114,8 +116,12 @@ export default function MissionsPage() {
 
   const changeMission = (m: Mission) => {
     setCurrent(m); setCode(m.template); setOutput(''); setOutputOk(null)
-    setDiffMsg(''); setHints([]); setHintCount(0); setTab('output')
+    setDiffMsg(''); setChatMessages([]); setChatInput(''); setHintCount(0); setTab('output')
   }
+
+  const scrollToBottom = useCallback(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
 
   const runCode = async () => {
     if (!pyReady || running) return
@@ -196,28 +202,37 @@ export default function MissionsPage() {
     setTimeout(() => setCelebration(''), 2500)
   }
 
-  const getHint = async () => {
-    if (hintCount>=3 || hintLoading) return
-    setHintLoading(true); setTab('hint')
-    const next = hintCount+1
+  const sendChat = async (message: string) => {
+    if (hintLoading) return
+    const userMsg = message.trim()
+    setHintLoading(true)
+    setTab('hint')
+    if (userMsg) setChatMessages(prev => [...prev, { role: 'user', text: userMsg }])
+    setChatInput('')
+    setTimeout(scrollToBottom, 50)
+
     try {
       const res = await fetch('/api/hint', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           missionTitle: current.title,
           missionDesc: current.description,
-          code, hintLevel: next,
-          previousHints: hints.map(h=>h.text),
-          errorMsg: outputOk===false ? diffMsg : undefined,
-          userId: userId
+          code,
+          studentMessage: userMsg,
+          chatHistory: chatMessages.map(m => ({ role: m.role, content: m.text })),
+          errorMsg: outputOk === false ? diffMsg : undefined,
+          userId,
         })
       })
       const data = await res.json()
-      setHints(h=>[...h,{level:next,text:data.hint||current.hints[hintCount]}])
+      const reply = data.hint || data.error || '응답을 받지 못했어요.'
+      setChatMessages(prev => [...prev, { role: 'ai', text: reply }])
+      setHintCount(c => Math.min(c + 1, 5))
     } catch {
-      setHints(h=>[...h,{level:next,text:current.hints[hintCount] || '힌트를 불러오지 못했어요.'}])
+      setChatMessages(prev => [...prev, { role: 'ai', text: '힌트를 불러오지 못했어요. 다시 시도해주세요.' }])
     }
-    setHintCount(next); setHintLoading(false)
+    setHintLoading(false)
+    setTimeout(scrollToBottom, 100)
   }
 
   const xpPct = Math.min((xp/1000)*100,100)
@@ -302,15 +317,36 @@ export default function MissionsPage() {
                   </div>
                 ) : <div className="text-xs text-gray-400 text-center mt-6">실행 버튼을 눌러보세요</div>
               ) : (
-                <div className="space-y-2">
-                  {hints.length===0 && !hintLoading && <div className="text-xs text-gray-400 text-center mt-4">막히면 AI 힌트를 요청해보세요</div>}
-                  {hints.map((h,i)=>(
-                    <div key={i} className="bg-blue-50 rounded-lg p-3">
-                      <div className="text-xs text-blue-400 mb-1 font-semibold">힌트 {h.level}단계</div>
-                      <div className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{h.text}</div>
-                    </div>
-                  ))}
-                  {hintLoading && <div className="text-xs text-gray-400 flex items-center gap-2"><span className="animate-spin">⟳</span> AI가 분석 중...</div>}
+                <div className="flex flex-col h-full">
+                  <div className="flex-1 overflow-y-auto space-y-2 pb-1">
+                    {chatMessages.length === 0 && !hintLoading && (
+                      <div className="text-xs text-gray-400 text-center mt-4 leading-relaxed">
+                        💬 AI 튜터에게 물어보세요<br/>
+                        <span className="text-gray-300">코드 분석, 오류 설명, 방향 힌트 등</span>
+                      </div>
+                    )}
+                    {chatMessages.map((m, i) => (
+                      <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
+                          m.role === 'user'
+                            ? 'bg-blue-500 text-white rounded-br-sm'
+                            : 'bg-gray-100 text-gray-700 rounded-bl-sm'
+                        }`}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ))}
+                    {hintLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-gray-400 flex items-center gap-1">
+                          <span className="animate-bounce">●</span>
+                          <span className="animate-bounce" style={{animationDelay:'0.15s'}}>●</span>
+                          <span className="animate-bounce" style={{animationDelay:'0.3s'}}>●</span>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
                 </div>
               )}
             </div>
@@ -332,11 +368,23 @@ export default function MissionsPage() {
                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
                 {running?'실행 중...':'▶ 실행'}
               </button>
-              <button onClick={getHint} disabled={hintCount>=3||hintLoading}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors">
-                💡 AI 힌트{hintCount>0?` (${hintCount}/3)`:''}
+              <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap">
+                💡 분석
               </button>
-              <div className="ml-auto text-xs text-gray-400">{pyReady?'🟢 Python 준비됨':'⏳ 로딩 중...'}</div>
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
+                placeholder="AI 튜터에게 질문하세요..."
+                className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-300"
+                disabled={hintLoading}
+              />
+              <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
+                className="px-3 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-40 transition-colors">
+                전송
+              </button>
+              <div className="text-xs text-gray-400 whitespace-nowrap">{pyReady?'🟢':'⏳'}</div>
             </div>
           </div>
         </div>

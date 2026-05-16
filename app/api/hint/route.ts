@@ -23,37 +23,42 @@ async function getTeacherKeys(userId: string): Promise<TeacherKeys> {
   return { geminiKey: null, groqKey: null }
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const { missionTitle, missionDesc, code, hintLevel, previousHints, errorMsg, userId } = await req.json()
+function buildPrompt(
+  missionTitle: string,
+  missionDesc: string,
+  code: string,
+  studentMessage: string,
+  chatHistory: { role: string; content: string }[],
+  errorMsg?: string,
+) {
+  const codeCtx = code?.trim().length > 5
+    ? `\n학생 코드:\n\`\`\`python\n${code}\n\`\`\``
+    : '\n(학생이 아직 코드를 작성하지 않았음)'
+  const errorCtx = errorMsg ? `\n실행 오류: ${errorMsg}` : ''
+  const historyCtx = chatHistory.length > 0
+    ? '\n\n이전 대화:\n' + chatHistory.map(m => `${m.role === 'ai' ? 'AI' : '학생'}: ${m.content}`).join('\n')
+    : ''
+  const msgCtx = studentMessage?.trim()
+    ? `\n\n학생 메시지: "${studentMessage}"`
+    : '\n\n학생이 도움을 요청함 (특별한 질문 없음)'
 
-    const levelInstructions: Record<number, string> = {
-      1: '방향만 살짝 암시해줘. 질문 형식으로. 절대 코드 보여주지 마.',
-      2: '어떤 함수/문법을 써야 하는지 구체적으로 언급해. 학생 코드 문제점을 짚어줘.',
-      3: '코드 뼈대를 ___ 형태로 보여줘. 거의 다 왔다고 격려해.',
-    }
-
-    const codeCtx = code?.trim().length > 5
-      ? `\n학생 코드:\n\`\`\`python\n${code}\n\`\`\``
-      : '\n(학생이 아직 코드를 작성하지 않았음)'
-
-    const errorCtx = errorMsg ? `\n실행 오류: ${errorMsg}` : ''
-    const prevCtx = previousHints?.length
-      ? `\n이전 힌트:\n${previousHints.map((h: string, i: number) => `${i + 1}단계: ${h}`).join('\n')}`
-      : ''
-
-    const prompt = `너는 고등학교 파이썬 튜터야. 절대 완성 코드 주지 마. 한국어로, 이모지 2-3개, 4문장 이내.
-학생마다 다른 상황에 맞게 개인화된 힌트를 줘. 학생 코드가 있으면 그 코드를 구체적으로 언급해.
+  return `너는 친근한 고등학교 파이썬 튜터야. 소크라테스식으로 가르쳐 — 절대 완성 코드 주지 마.
+한국어로, 이모지 1-2개, 3-4문장 이내. 학생 코드가 있으면 구체적으로 언급해.
+대화처럼 자연스럽게, 학생이 스스로 생각하도록 질문으로 유도해.
 
 문제: ${missionTitle}
 ${missionDesc}
-${codeCtx}${errorCtx}${prevCtx}
+${codeCtx}${errorCtx}${historyCtx}${msgCtx}
 
-힌트 ${hintLevel}단계: ${levelInstructions[hintLevel] || levelInstructions[1]}
+지금 학생 상황에 딱 맞는 개인화된 피드백을 줘. 힌트 번호 붙이지 마. 마지막엔 생각을 유도하는 질문으로 끝내.`
+}
 
-마지막에 응원으로 끝내. 답변을 매번 다양하게 해줘.`
+export async function POST(req: NextRequest) {
+  try {
+    const { missionTitle, missionDesc, code, studentMessage, chatHistory = [], errorMsg, userId } = await req.json()
 
-    // 교사 키 조회 (Gemini 우선, 실패하면 Groq로 자동 전환)
+    const prompt = buildPrompt(missionTitle, missionDesc, code, studentMessage, chatHistory, errorMsg)
+
     if (userId) {
       const { geminiKey, groqKey } = await getTeacherKeys(userId)
       if (geminiKey) {
