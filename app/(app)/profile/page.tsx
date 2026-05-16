@@ -26,6 +26,8 @@ export default function ProfilePage() {
   const [groqSaved, setGroqSaved] = useState('')
   const [groqLoading, setGroqLoading] = useState(false)
   const [groqMsg, setGroqMsg] = useState('')
+  const [quota, setQuota] = useState<any>(null)
+  const [quotaLoading, setQuotaLoading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -86,6 +88,22 @@ export default function ProfilePage() {
     const { error } = await sb.auth.updateUser({ password: pwNew })
     if (error) { setPwMsg(error.message); return }
     setPwMsg('✓ 비밀번호가 변경됐어요!'); setPwNew('')
+  }
+
+  async function checkQuota() {
+    setQuotaLoading(true)
+    setQuota(null)
+    const sb = getClient()
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return
+    const res = await fetch('/api/check-quota', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id }),
+    })
+    const data = await res.json()
+    setQuota(data)
+    setQuotaLoading(false)
   }
 
   async function saveGroqKey() {
@@ -263,6 +281,57 @@ export default function ProfilePage() {
             <p className="text-xs text-gray-400">
               👉 <a href="https://console.groq.com" target="_blank" rel="noopener" className="text-orange-500 hover:underline">console.groq.com</a> → 구글 로그인 → API Keys → 무료 발급 (14,400회/일)
             </p>
+          </div>
+
+          <div className="border-t border-gray-100" />
+
+          {/* 잔여량 확인 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">📊 API 잔여량 확인</span>
+              <div className="flex items-center gap-2">
+                <a href="https://aistudio.google.com/plan_information" target="_blank" rel="noopener"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                  Gemini 확인 →
+                </a>
+                <button onClick={checkQuota} disabled={quotaLoading || !groqSaved}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-40 transition-colors">
+                  {quotaLoading ? '확인 중...' : 'Groq 확인'}
+                </button>
+              </div>
+            </div>
+            {quota?.error && (
+              <p className="text-xs text-red-500">{quota.error}</p>
+            )}
+            {quota?.groq && (
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  {
+                    label: '요청 잔여',
+                    value: quota.groq.remainingRequests ?? '-',
+                    total: quota.groq.limitRequests,
+                    color: 'orange',
+                  },
+                  {
+                    label: '토큰 잔여',
+                    value: quota.groq.remainingTokens != null ? quota.groq.remainingTokens.toLocaleString() : '-',
+                    total: quota.groq.limitTokens,
+                    color: 'orange',
+                  },
+                ].map(item => (
+                  <div key={item.label} className="bg-orange-50 rounded-xl p-3">
+                    <div className="text-xs text-orange-500 mb-1">{item.label}</div>
+                    <div className="text-lg font-bold text-orange-700">{item.value}</div>
+                    {item.total != null && (
+                      <div className="text-xs text-orange-400">/ {item.total.toLocaleString()}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {!groqSaved && (
+              <p className="text-xs text-gray-400">Groq 키를 등록하면 잔여량을 확인할 수 있어요.</p>
+            )}
           </div>
         </div>
       )}
