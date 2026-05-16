@@ -23,21 +23,39 @@ async function getTeacherKeys(userId: string): Promise<TeacherKeys> {
   return { geminiKey: null, groqKey: null }
 }
 
+const DIFFICULTY_GUIDE: Record<string, string> = {
+  '1': '기초: 개념 1개만 사용, 5줄 이내 정답, input() 없음',
+  '2': '응용: 개념 2-3개 조합, 10줄 이내 정답, 조건/반복 포함 가능',
+  '3': '심화: 알고리즘 사고 필요, 중첩 구조 허용, 창의적 문제',
+}
+
 const MISSION_PROMPT = (concept: string, difficulty: string, context: string | undefined) =>
-  `너는 고등학교 파이썬 교육 전문가야. 다음 JSON 형식으로만 답해줘. 다른 말 하지 마.
+  `너는 고등학교 파이썬 교육 전문가야. 아래 규칙을 반드시 지켜서 JSON만 출력해.
 
-요청: 개념=${concept}, 난이도=${difficulty}(1기초2응용3심화), 테마=${context || '없음'}
+## 요청
+- 개념: ${concept}
+- 난이도: ${difficulty}단계 (${DIFFICULTY_GUIDE[difficulty] || DIFFICULTY_GUIDE['2']})
+- 테마/맥락: ${context || '자유'}
 
+## 필수 규칙
+1. expectedOutput은 파이썬으로 실제 실행했을 때 나오는 정확한 출력이어야 함 (공백/줄바꿈 포함)
+2. template는 학생이 채울 빈 코드 (# TODO 주석으로 작성 위치 표시)
+3. description은 줄바꿈을 \\n으로, 예시 입출력 반드시 포함
+4. hints[0]은 방향만, hints[1]은 문법 언급, hints[2]는 코드 구조 일부
+5. needsInput이 true면 defaultInput에 테스트용 입력값 작성
+6. 절대 한국어 변수명 사용 금지
+
+## 출력 형식 (JSON만, 다른 말 없이)
 {
-  "title": "재미있는 미션 제목",
-  "topic": "핵심 개념",
-  "description": "학생에게 친근한 문제 설명 (줄바꿈은\\n)",
-  "template": "# 주석 포함 코드 템플릿 (줄바꿈은\\n)",
-  "expectedOutput": "정확한 예상 출력",
-  "tags": ["태그1", "태그2"],
+  "title": "짧고 흥미로운 제목",
+  "topic": "${concept}",
+  "description": "문제 설명\\n\\n예시:\\n입력: xxx\\n출력: yyy",
+  "template": "# TODO: 여기에 코드를 작성하세요\\n",
+  "expectedOutput": "정확한 출력 (공백/줄바꿈 그대로)",
+  "tags": ["${concept}"],
   "needsInput": false,
   "defaultInput": "",
-  "hints": ["1단계: 개념 암시", "2단계: 문법 언급", "3단계: 구조 일부"]
+  "hints": ["방향 암시 질문", "사용할 문법/함수 언급", "코드 뼈대 일부"]
 }`
 
 function parseJson(text: string) {
