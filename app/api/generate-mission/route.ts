@@ -41,7 +41,9 @@ const MISSION_PROMPT = (concept: string, difficulty: string, context: string | u
 }`
 
 function parseJson(text: string) {
-  const match = text.match(/\{[\s\S]*\}/)
+  // 마크다운 코드블록 제거
+  const cleaned = text.replace(/```(?:json)?\n?/g, '').trim()
+  const match = cleaned.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('AI 응답 파싱 실패. 다시 시도해주세요.')
   return JSON.parse(match[0])
 }
@@ -72,6 +74,7 @@ export async function POST(req: NextRequest) {
           model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 800,
+          response_format: { type: 'json_object' },
         })
         const mission = parseJson(completion.choices[0].message.content || '')
         mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
