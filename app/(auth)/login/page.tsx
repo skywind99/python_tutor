@@ -26,20 +26,26 @@ function LoginForm() {
     if (searchParams.get('mode') === 'signup') setMode('signup')
   }, [searchParams])
 
-  function toEmail(id: string) { return `${id.trim().toLowerCase()}@pytutor.local` }
+  // @가 있으면 이메일 그대로, 없으면 아이디로 변환
+  function toEmail(input: string) {
+    const v = input.trim()
+    return v.includes('@') ? v : `${v.toLowerCase()}@pytutor.local`
+  }
 
   async function handleSubmit() {
     setError(''); setLoading(true)
     const sb = getClient()
     try {
-      if (!username.trim()) throw new Error('아이디를 입력해주세요.')
-      if (!/^[a-z0-9_.]+$/i.test(username.trim())) throw new Error('아이디는 영문·숫자·_·.만 사용할 수 있어요.')
+      if (!username.trim()) throw new Error('아이디 또는 이메일을 입력해주세요.')
       const email = toEmail(username)
       if (mode === 'login') {
         const { error } = await sb.auth.signInWithPassword({ email, password })
-        if (error) throw new Error('아이디 또는 비밀번호가 올바르지 않아요.')
+        if (error) throw new Error('아이디(이메일) 또는 비밀번호가 올바르지 않아요.')
         router.push('/dashboard')
       } else {
+        // 회원가입은 아이디(@ 없음)만 허용
+        if (username.includes('@')) throw new Error('회원가입은 아이디로만 가능해요. (이메일 형식 불가)')
+        if (!/^[a-z0-9_.]+$/i.test(username.trim())) throw new Error('아이디는 영문·숫자·_·.만 사용할 수 있어요.')
         if (!name.trim()) throw new Error('이름을 입력해주세요.')
         if (password.length < 6) throw new Error('비밀번호는 6자 이상이어야 해요.')
         const { data, error } = await sb.auth.signUp({
@@ -117,9 +123,11 @@ function LoginForm() {
 
           {/* 공통 필드 */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1.5 block">아이디</label>
+            <label className="text-xs font-medium text-gray-500 mb-1.5 block">
+              {mode === 'login' ? '아이디 또는 이메일' : '아이디'}
+            </label>
             <input type="text" value={username} onChange={e=>setUsername(e.target.value)}
-              placeholder="영문·숫자·_·. 사용 가능"
+              placeholder={mode === 'login' ? 'student01  또는  user@email.com' : '영문·숫자·_·. 사용 가능'}
               autoComplete="username"
               className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-gray-400 transition-colors"/>
           </div>
