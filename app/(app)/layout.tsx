@@ -24,7 +24,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const { data: { user } } = await sb.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data } = await sb.from('profiles').select('*').eq('id', user.id).single()
-      setProfile({ ...data, email: user.email })
+
+      let schoolName: string = data?.school || ''
+
+      // 학생이고 반에 소속돼 있으면 담당 교사의 학교명을 가져옴
+      if (data?.role === 'student' && data?.class_id) {
+        const { data: cls } = await sb.from('classes').select('teacher_id').eq('id', data.class_id).single()
+        if (cls?.teacher_id) {
+          const { data: teacher } = await sb.from('profiles').select('school').eq('id', cls.teacher_id).single()
+          schoolName = teacher?.school || ''
+        }
+      }
+
+      setProfile({ ...data, email: user.email, schoolName })
       setLoading(false)
     }
     check()
@@ -80,7 +92,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           className="flex items-center gap-2 mr-5">
           <span className="text-xl">💎</span>
           <div className="hidden sm:block">
-            <span className="font-bold text-white text-sm leading-none">파이썬 학습실</span>
+            <span className="font-bold text-white text-sm leading-none">
+              {profile?.schoolName ? `${profile.schoolName} 파이썬 학습실` : '파이썬 학습실'}
+            </span>
             <div className="text-xs font-medium mt-0.5 px-1.5 py-0.5 rounded-full inline-block ml-1"
               style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', fontSize: 10 }}>
               {isTeacher ? '교사' : '학생'}

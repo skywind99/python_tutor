@@ -11,6 +11,7 @@ export default function ProfilePage() {
   const router = useRouter()
   const [profile, setProfile] = useState<any>(null)
   const [name, setName] = useState('')
+  const [school, setSchool] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [currentClass, setCurrentClass] = useState<any>(null)
   const [saving, setSaving] = useState(false)
@@ -37,6 +38,7 @@ export default function ProfilePage() {
       const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).single()
       setProfile({ ...prof, email: user.email })
       setName(prof?.name || '')
+      setSchool(prof?.school || '')
       if (prof?.gemini_key) setGeminiSaved('●'.repeat(20) + prof.gemini_key.slice(-6))
       if (prof?.groq_key) setGroqSaved('●'.repeat(20) + prof.groq_key.slice(-6))
       if (prof?.class_id) {
@@ -63,7 +65,7 @@ export default function ProfilePage() {
     const sb = getClient()
     const { data: { user } } = await sb.auth.getUser()
     if (!user) return
-    await sb.from('profiles').update({ name }).eq('id', user.id)
+    await sb.from('profiles').update({ name, ...(profile?.role === 'teacher' ? { school } : {}) }).eq('id', user.id)
     setSaved(true); setSaving(false)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -173,15 +175,25 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
-        <div className="flex gap-2">
-          <input value={name} onChange={e=>setName(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-gray-400"
-            placeholder="이름"/>
-          <button onClick={saveName} disabled={saving}
-            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors"
-            style={{background:themeColor}}>
-            {saved?'✓ 저장됨':saving?'...':'이름 저장'}
-          </button>
+        <div className="space-y-2">
+          {isTeacher && (
+            <input value={school} onChange={e=>setSchool(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-gray-400"
+              placeholder="학교 이름 (예: 한국고등학교)"/>
+          )}
+          <div className="flex gap-2">
+            <input value={name} onChange={e=>setName(e.target.value)}
+              className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-gray-400"
+              placeholder="이름"/>
+            <button onClick={saveName} disabled={saving}
+              className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors"
+              style={{background:themeColor}}>
+              {saved?'✓ 저장됨':saving?'...':'저장'}
+            </button>
+          </div>
+          {isTeacher && school && (
+            <p className="text-xs text-gray-400">Nav에 <span className="font-medium text-gray-600">"{school} 파이썬 학습실"</span>로 표시돼요</p>
+          )}
         </div>
       </div>
 
