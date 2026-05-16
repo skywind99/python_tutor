@@ -1,6 +1,6 @@
 'use client'
 import { useParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { UNITS } from '@/data/missions'
 import { UNIT_CONTENTS } from '@/data/content'
@@ -12,23 +12,25 @@ function getClient() {
 
 declare global { interface Window { Sk: any } }
 
+const XP_PER_EXAMPLE = 5
+
 export default function ExamplesPage() {
   const params = useParams()
   const unitId = Number(params.unitId)
   const unit = UNITS.find(u => u.id === unitId)
   const content = UNIT_CONTENTS.find(c => c.unitId === unitId)
-  const [role, setRole] = useState('student')
   const [pyReady, setPyReady] = useState(false)
   const [outputs, setOutputs] = useState<Record<number, {text:string, isError:boolean}>>({})
   const [running, setRunning] = useState<number | null>(null)
   const [codes, setCodes] = useState<Record<number, string>>({})
   const [inputValues, setInputValues] = useState<Record<number, string[]>>({})
+  const [xpedSet, setXpedSet] = useState<Set<number>>(new Set())
+  const [totalXP, setTotalXP] = useState(0)
+  const [xpPopup, setXpPopup] = useState<{key: number} | null>(null)
+  const popupKeyRef = useRef(0)
 
   useEffect(() => {
-    getClient().auth.getUser().then(({ data: { user } }) => {
-      if (user) getClient().from('profiles').select('role').eq('id', user.id).single()
-        .then(({ data }) => { if (data) setRole(data.role) })
-    })
+    getClient().auth.getUser()
 
     if (content) {
       const initialCodes: Record<number, string> = {}
@@ -82,6 +84,15 @@ export default function ExamplesPage() {
         Sk.importMainWithBody('<stdin>', false, code, true)
       )
       setOutputs(prev => ({ ...prev, [index]: { text: out.trim() || '(출력 없음)', isError: false } }))
+
+      if (!xpedSet.has(index)) {
+        setXpedSet(prev => new Set([...prev, index]))
+        setTotalXP(prev => prev + XP_PER_EXAMPLE)
+        popupKeyRef.current += 1
+        const key = popupKeyRef.current
+        setXpPopup({ key })
+        setTimeout(() => setXpPopup(p => p?.key === key ? null : p), 2000)
+      }
     } catch (e: any) {
       const errMsg = String(e).replace(/^.*?Error:/, '오류:')
       setOutputs(prev => ({ ...prev, [index]: { text: errMsg, isError: true } }))
@@ -95,8 +106,29 @@ export default function ExamplesPage() {
     setOutputs(prev => { const next = {...prev}; delete next[index]; return next })
   }
 
+  const maxXP = (content?.examples.length ?? 0) * XP_PER_EXAMPLE
+
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <style>{`
+        @keyframes xpFloat {
+          0%   { opacity: 0; transform: translateY(0)   scale(0.8); }
+          15%  { opacity: 1; transform: translateY(-10px) scale(1.05); }
+          70%  { opacity: 1; transform: translateY(-20px) scale(1); }
+          100% { opacity: 0; transform: translateY(-36px) scale(0.9); }
+        }
+      `}</style>
+
+      {/* XP 팝업 */}
+      {xpPopup && (
+        <div key={xpPopup.key} className="fixed top-8 right-8 z-50 pointer-events-none"
+          style={{ animation: 'xpFloat 2s ease-out forwards' }}>
+          <div className="bg-teal-500 text-white font-bold px-5 py-2.5 rounded-full shadow-xl text-sm flex items-center gap-2">
+            💎 +{XP_PER_EXAMPLE} XP
+          </div>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
@@ -112,15 +144,26 @@ export default function ExamplesPage() {
             <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
           </div>
         </div>
-        <div className="text-xs text-gray-400">{pyReady ? '🟢 실행 준비됨' : '⏳ 로딩 중...'}</div>
+
+        <div className="flex items-center gap-3">
+          {/* 이번 세션 XP */}
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+            totalXP > 0 ? 'bg-teal-50 text-teal-700' : 'bg-gray-50 text-gray-300'
+          }`}>
+            💎 {totalXP}/{maxXP} XP
+          </div>
+          <div className="text-xs text-gray-400">{pyReady ? '🟢 실행 준비됨' : '⏳ 로딩 중...'}</div>
+        </div>
       </div>
 
+      {/* 예제 목록 */}
       {content.examples.map((example, i) => {
         const currentCode = codes[i] ?? example.code
         const output = outputs[i]
         const isModified = currentCode !== example.code
         const hasInputs = example.defaultInputs && example.defaultInputs.length > 0
         const currentInputs = inputValues[i] || []
+        const alreadyXped = xpedSet.has(i)
 
         return (
           <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -130,6 +173,9 @@ export default function ExamplesPage() {
                 <p className="text-sm text-gray-400 mt-0.5">{example.description}</p>
               </div>
               <div className="flex items-center gap-2">
+                {alreadyXped && (
+                  <span className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full font-medium">+{XP_PER_EXAMPLE} XP 획득 ✓</span>
+                )}
                 {isModified && (
                   <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">수정됨</span>
                 )}
@@ -219,7 +265,7 @@ export default function ExamplesPage() {
 
               {!output && (
                 <p className="text-xs text-gray-400 text-center">
-                  코드를 직접 수정하고 ▶ 실행을 눌러보세요. 어떻게 바뀌는지 확인해봐요!
+                  코드를 직접 수정하고 ▶ 실행을 눌러보세요.{!alreadyXped && ` 성공하면 +${XP_PER_EXAMPLE} XP!`}
                 </p>
               )}
             </div>
