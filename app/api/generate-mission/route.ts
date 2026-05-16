@@ -51,16 +51,20 @@ export async function POST(req: NextRequest) {
     const { concept, difficulty, context, unitId, userId } = await req.json()
     const prompt = MISSION_PROMPT(concept, difficulty, context)
 
-    // 교사 키 조회 (Gemini 우선, 없으면 Groq)
+    // 교사 키 조회 (Gemini 우선, 실패하면 Groq로 자동 전환)
     if (userId) {
       const { geminiKey, groqKey } = await getTeacherKeys(userId)
       if (geminiKey) {
-        const genAI = new GoogleGenerativeAI(geminiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-        const result = await model.generateContent(prompt)
-        const mission = parseJson(result.response.text())
-        mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
-        return NextResponse.json({ mission, provider: 'gemini' })
+        try {
+          const genAI = new GoogleGenerativeAI(geminiKey)
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
+          const result = await model.generateContent(prompt)
+          const mission = parseJson(result.response.text())
+          mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
+          return NextResponse.json({ mission, provider: 'gemini' })
+        } catch {
+          // Gemini 실패 시 Groq로 fallback
+        }
       }
       if (groqKey) {
         const groq = new Groq({ apiKey: groqKey })

@@ -53,14 +53,18 @@ ${codeCtx}${errorCtx}${prevCtx}
 
 마지막에 응원으로 끝내. 답변을 매번 다양하게 해줘.`
 
-    // 교사 키 조회 (Gemini 우선, 없으면 Groq)
+    // 교사 키 조회 (Gemini 우선, 실패하면 Groq로 자동 전환)
     if (userId) {
       const { geminiKey, groqKey } = await getTeacherKeys(userId)
       if (geminiKey) {
-        const genAI = new GoogleGenerativeAI(geminiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-        const result = await model.generateContent(prompt)
-        return NextResponse.json({ hint: result.response.text(), provider: 'gemini' })
+        try {
+          const genAI = new GoogleGenerativeAI(geminiKey)
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
+          const result = await model.generateContent(prompt)
+          return NextResponse.json({ hint: result.response.text(), provider: 'gemini' })
+        } catch {
+          // Gemini 실패 시 Groq로 fallback
+        }
       }
       if (groqKey) {
         const groq = new Groq({ apiKey: groqKey })
