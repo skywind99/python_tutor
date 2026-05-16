@@ -33,6 +33,34 @@ export const MISSIONS: Mission[] = [
       '✏️ 두 줄 모두:\nprint("Hello, Python!")\nprint("파이썬 학습 시작!")',
     ]
   },
+  {
+    id: 19, unitId: 1,
+    title: "나의 프로필 카드",
+    level: 1, icon: "user", topic: "변수 · print()",
+    description: `아래 변수를 활용해서\n프로필을 출력하세요.\n\n이름: 홍길동\n나이: 17살\n좋아하는 것: 파이썬`,
+    template: `name = "홍길동"\nage = 17\nhobby = "파이썬"\n\n# 아래 형식으로 출력하세요\n`,
+    expectedOutput: "이름: 홍길동\n나이: 17살\n좋아하는 것: 파이썬",
+    tags: ["변수", "print", "str"], needsInput: false,
+    hints: [
+      "💡 print()에 쉼표(,)로 여러 값을 넣으면 한 줄에 출력돼요. 변수도 그냥 넣으면 돼요.",
+      '🔍 print("이름:", name) 처럼 문자열과 변수를 함께 써봐요. 숫자 뒤에 글자를 붙이려면 str()이 필요해요.',
+      '✏️ 구조:\nprint("이름:", name)\nprint("나이: " + str(age) + "살")\nprint("좋아하는 것:", hobby)',
+    ]
+  },
+  {
+    id: 20, unitId: 1,
+    title: "영수증 출력기",
+    level: 2, icon: "receipt", topic: "변수 · str() · 문자열 연결",
+    description: `아래 변수를 활용해서\n영수증 형식으로 출력하세요.\n\n[ 분식집 영수증 ]\n메뉴: 떡볶이\n가격: 4500원\n수량: 2개\n합계: 9000원`,
+    template: `menu = "떡볶이"\nprice = 4500\nqty = 2\n\n# 영수증 형식으로 출력하세요\n`,
+    expectedOutput: "[ 분식집 영수증 ]\n메뉴: 떡볶이\n가격: 4500원\n수량: 2개\n합계: 9000원",
+    tags: ["변수", "str", "문자열연결", "*"], needsInput: false,
+    hints: [
+      "💡 total = price * qty 로 합계를 먼저 계산하고, 각 줄을 print()로 출력해요.",
+      '🔍 숫자를 문자열과 합치려면 str()로 변환해야 해요. print("가격: " + str(price) + "원")',
+      '✏️ 구조:\ntotal = price * qty\nprint("[ 분식집 영수증 ]")\nprint("메뉴:", menu)\nprint("가격: " + str(price) + "원")\nprint("수량: " + str(qty) + "개")\nprint("합계: " + str(total) + "원")',
+    ]
+  },
 
   // 단원 2: 연산자
   {
@@ -288,7 +316,7 @@ export const MISSIONS: Mission[] = [
 ]
 
 export const UNITS = [
-  { id: 1, title: "출력과 변수", icon: "terminal-2", description: "파이썬의 시작! 화면에 출력하고 변수에 값을 저장해요.", missionIds: [1] },
+  { id: 1, title: "출력과 변수", icon: "terminal-2", description: "파이썬의 시작! 화면에 출력하고 변수에 값을 저장해요.", missionIds: [1, 19, 20] },
   { id: 2, title: "연산자", icon: "calculator", description: "산술·비교·논리 연산자를 배워요.", missionIds: [2, 16] },
   { id: 3, title: "입력", icon: "keyboard", description: "input()으로 사용자 입력을 받아 인터랙티브한 프로그램을 만들어요.", missionIds: [17, 18] },
   { id: 4, title: "조건문", icon: "git-branch", description: "상황에 따라 다르게 동작하는 코드를 작성해요.", missionIds: [3, 4] },
