@@ -456,8 +456,8 @@ export default function TutorialPage() {
           </div>
 
           {/* Interactive content */}
-          {page.type === 'quiz' && <QuizPage page={page} onPass={onPassPage} />}
-          {(page.type === 'fillblank' || page.type === 'multiblank') && <FillBlankPage page={page} onPass={onPassPage} />}
+          {page.type === 'quiz' && <QuizPage key={page.id} page={page} onPass={onPassPage} />}
+          {(page.type === 'fillblank' || page.type === 'multiblank') && <FillBlankPage key={page.id} page={page} onPass={onPassPage} />}
         </div>
 
         {/* Mission complete modal */}
