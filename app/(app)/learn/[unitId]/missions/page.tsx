@@ -382,27 +382,26 @@ export default function MissionsPage() {
           {/* AI 튜터 채팅 */}
           <div className="flex flex-col overflow-hidden" style={{flex:'4 1 0%',minHeight:0,background:'#f9fafb'}}>
             {/* 채팅 헤더 */}
-            <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{background:'white',borderBottom:'1px solid #e5e7eb'}}>
-              <div style={{width:36,height:36,flexShrink:0}}>
-                <DotLottie src="/lottie/animation/Live chatbot.lottie" loop autoplay />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-gray-700">AI 튜터</div>
+            <div className="flex items-center justify-between px-3 py-2 flex-shrink-0" style={{background:'white',borderBottom:'1px solid #e5e7eb'}}>
+              <div className="text-xs font-semibold text-gray-700">AI 튜터</div>
+              <div className="flex items-center gap-2">
                 {hintCount > 0 && (
-                  <div className="text-xs" style={{color:'#9ca3af'}}>힌트 {hintCount}회 사용</div>
+                  <span className="text-xs" style={{color:'#9ca3af'}}>힌트 {hintCount}회 사용</span>
+                )}
+                {hintLoading && (
+                  <span className="text-xs animate-pulse" style={{color:'#6366f1'}}>생각 중...</span>
                 )}
               </div>
-              {hintLoading && (
-                <span className="text-xs animate-pulse" style={{color:'#6366f1'}}>생각 중...</span>
-              )}
             </div>
 
             {/* 메시지 목록 */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
               {chatMessages.length === 0 && !hintLoading && (
-                <div className="text-center mt-6 leading-relaxed">
-                  <div className="text-2xl mb-2">💬</div>
-                  <p className="text-xs" style={{color:'#9ca3af'}}>AI 튜터에게 질문하거나<br/>코드를 분석 받아보세요!</p>
+                <div className="flex flex-col items-center justify-center h-full gap-2">
+                  <div style={{width:80,height:80}}>
+                    <DotLottie src="/lottie/animation/Live chatbot.lottie" loop autoplay />
+                  </div>
+                  <p className="text-xs text-center" style={{color:'#9ca3af'}}>AI 튜터에게 질문하거나<br/>코드를 분석 받아보세요!</p>
                 </div>
               )}
               {chatMessages.map((m, i) => (
@@ -434,7 +433,7 @@ export default function MissionsPage() {
 
             {/* 입력창 */}
             <div className="p-2 flex gap-1.5 flex-shrink-0 items-center" style={{background:'white',borderTop:'1px solid #e5e7eb'}}>
-              <div style={{width:28,height:28,flexShrink:0}}>
+              <div style={{width:44,height:44,flexShrink:0}}>
                 <DotLottie src="/lottie/animation/Flirting Dog.lottie" loop autoplay />
               </div>
               <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
