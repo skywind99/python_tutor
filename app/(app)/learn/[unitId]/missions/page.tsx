@@ -355,37 +355,39 @@ export default function MissionsPage() {
           {/* Code editor */}
           <div className="flex-[3] flex flex-col min-h-0">
             <textarea value={code} onChange={e=>setCode(e.target.value)}
-              className="flex-1 p-4 font-mono text-sm text-gray-800 bg-gray-50 border-none outline-none resize-none" spellCheck={false}/>
+              className="flex-1 p-4 font-mono text-sm text-gray-800 bg-gray-50 border-none outline-none resize-none overflow-auto" spellCheck={false}/>
             {current.needsInput && (
-              <div className="bg-white border-t border-gray-100 px-4 py-2 flex items-center gap-3">
+              <div className="bg-white border-t border-gray-100 px-4 py-2 flex items-center gap-3 flex-none">
                 <span className="text-xs text-gray-400">테스트 입력</span>
                 <input className="flex-1 text-xs font-mono border border-gray-200 rounded px-2 py-1 outline-none" defaultValue={current.defaultInput}
                   onChange={e=>{(current as any)._testInput=e.target.value}}/>
               </div>
             )}
-            <div className="bg-white border-t border-gray-100 px-4 py-2.5 flex gap-2 items-center">
-              <button onClick={runCode} disabled={!pyReady||running}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
-                {running?'실행 중...':'▶ 실행'}
-              </button>
-              <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap">
-                💡 분석
-              </button>
-              <input
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
-                placeholder="AI 튜터에게 질문하세요..."
-                className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-300"
-                disabled={hintLoading}
-              />
-              <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
-                className="px-3 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-40 transition-colors">
-                전송
-              </button>
-              <div className="text-xs text-gray-400 whitespace-nowrap">{pyReady?'🟢':'⏳'}</div>
-            </div>
+          </div>
+
+          {/* 하단 고정 버튼바 */}
+          <div className="bg-white border-t border-gray-100 px-4 py-2.5 flex gap-2 items-center flex-none">
+            <button onClick={runCode} disabled={!pyReady||running}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
+              {running?'실행 중...':'▶ 실행'}
+            </button>
+            <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap">
+              💡 분석
+            </button>
+            <input
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
+              placeholder="AI 튜터에게 질문하세요..."
+              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-300"
+              disabled={hintLoading}
+            />
+            <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
+              className="px-3 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-40 transition-colors">
+              전송
+            </button>
+            <div className="text-xs text-gray-400 whitespace-nowrap">{pyReady?'🟢':'⏳'}</div>
           </div>
         </div>
 
