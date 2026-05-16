@@ -25,19 +25,18 @@ export async function GET() {
 
     const { data: prof } = await sb.from('profiles').select('class_id, role').eq('id', user.id).single()
 
-    let classId = prof?.class_id
+    let query = sb.from('custom_missions').select('*').order('created_at', { ascending: false })
 
     if (prof?.role === 'teacher') {
-      const { data: cls } = await sb.from('classes').select('id').eq('teacher_id', user.id).single()
-      classId = cls?.id
+      // 교사: 자신이 만든 문제 전체 (반이 여러 개여도 teacher_id로 직접 조회)
+      query = query.eq('teacher_id', user.id)
+    } else {
+      // 학생: 소속 반의 문제
+      if (!prof?.class_id) return NextResponse.json({ missions: [] })
+      query = query.eq('class_id', prof.class_id)
     }
 
-    if (!classId) return NextResponse.json({ missions: [] })
-
-    const { data: missions } = await sb.from('custom_missions')
-      .select('*')
-      .eq('class_id', classId)
-      .order('created_at', { ascending: false })
+    const { data: missions } = await query
 
     return NextResponse.json({ missions: missions || [] })
   } catch {
