@@ -71,6 +71,7 @@ export default function MissionsPage() {
   const [scorePopup, setScorePopup] = useState<{text:string}|null>(null)
   const [role, setRole] = useState('student')
   const [userId, setUserId] = useState<string|null>(null)
+  const [customMissions, setCustomMissions] = useState<any[]>([])
   const gemIdRef = useRef(0)
 
   const [showSuccessLottie, setShowSuccessLottie] = useState(false)
@@ -95,6 +96,12 @@ export default function MissionsPage() {
       setUserId(user.id)
       const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).single()
       if (prof) setRole(prof.role)
+      try {
+        const cmRes = await fetch('/api/custom-missions')
+        const cmData = await cmRes.json()
+        const unitCustom = (cmData.missions || []).filter((m: any) => m.unit_id === unitId)
+        setCustomMissions(unitCustom)
+      } catch { /* ignore */ }
       try {
         const res = await fetch('/api/progress')
         const data = await res.json()
@@ -278,11 +285,12 @@ export default function MissionsPage() {
           <Link href="/learn" className="text-xs hover:opacity-80 mb-2 block transition-opacity" style={{color:'#8b949e'}}>← 단원 목록</Link>
           <div className="text-xs font-semibold mb-0.5" style={{color:'#8b949e'}}>단원 {unitId}</div>
           <div className="font-semibold text-sm text-white">{unit?.title}</div>
-          <div className="flex gap-1 mt-2">
+          <div className="flex gap-1 mt-2 flex-wrap">
             <Link href={`/learn/${unitId}/concept`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>📖</Link>
             <Link href={`/learn/${unitId}/examples`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>💻</Link>
             <Link href={`/learn/${unitId}/guided`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>✏️</Link>
             <span className="text-xs px-2 py-1 rounded-lg font-medium" style={{background:'rgba(249,115,22,0.15)',color:'#fb923c'}}>🎯</span>
+            <Link href={`/learn/${unitId}/custom-missions`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(139,92,246,0.15)',color:'#a78bfa'}}>✨</Link>
           </div>
         </div>
         {missions.map(m => {
@@ -308,6 +316,22 @@ export default function MissionsPage() {
             </button>
           )
         })}
+        {customMissions.length > 0 && (
+          <div className="mt-1" style={{borderTop:'1px solid #21262d'}}>
+            <div className="px-3 pt-2 pb-1 text-xs font-semibold" style={{color:'#a78bfa'}}>✨ 추가문제</div>
+            {customMissions.map(m => {
+              const levelLabel = ['', '기초', '응용', '심화'][m.level] || '응용'
+              return (
+                <Link key={m.id} href={`/custom-mission/${m.id}`}
+                  className="block text-left p-3 transition-colors hover:opacity-80"
+                  style={{borderBottom:'1px solid #21262d',background:'rgba(139,92,246,0.05)'}}>
+                  <div className="text-xs font-semibold text-white truncate">{m.title}</div>
+                  <div className="text-xs mt-0.5" style={{color:'#a78bfa'}}>{levelLabel} · {m.topic}</div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
         {role === 'teacher' && (
           <Link href="/teacher/create-mission" className="m-3 py-2 text-center text-xs rounded-xl font-medium transition-colors" style={{background:'rgba(31,111,235,0.15)',color:'#58a6ff'}}>
             ✨ 문제 만들기
@@ -599,16 +623,11 @@ export default function MissionsPage() {
         </div>
       </div>
 
-      {/* ── 성공 오버레이: Confetti 배경 + 점핑 캐릭터 ── */}
+      {/* ── 성공 오버레이 ── */}
       {showSuccessLottie && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
-          style={{background:'rgba(0,0,0,0.25)'}}>
-          {/* 폭죽 배경 */}
-          <div className="absolute inset-0">
-            <DotLottie src="/lottie/animation/Confetti.lottie" loop autoplay />
-          </div>
-          {/* 점핑 캐릭터 */}
-          <div className="relative z-10" style={{width:320,height:320}}>
+          style={{background:'rgba(0,0,0,0.18)'}}>
+          <div style={{width:320,height:320}}>
             <DotLottie src="/lottie/animation/Cute Mascot Jumping Character.lottie" loop={false} autoplay />
           </div>
         </div>

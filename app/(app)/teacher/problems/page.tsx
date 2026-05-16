@@ -24,6 +24,9 @@ export default function ProblemsPage() {
   const [customMissions, setCustomMissions] = useState<any[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [movingId, setMovingId] = useState<string | null>(null)
+  const [editingMission, setEditingMission] = useState<any | null>(null)
+  const [editForm, setEditForm] = useState({ title: '', topic: '', description: '', expectedOutput: '', level: 2 })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const loadCustomMissions = useCallback(async () => {
     const res = await fetch('/api/custom-missions')
@@ -92,6 +95,36 @@ export default function ProblemsPage() {
     }
   }
 
+  function openEdit(m: any) {
+    setEditingMission(m)
+    setEditForm({
+      title: m.title || '',
+      topic: m.topic || '',
+      description: m.description || '',
+      expectedOutput: m.expected_output || '',
+      level: m.level ?? 2,
+    })
+  }
+
+  async function saveEdit() {
+    if (!editingMission) return
+    setSavingEdit(true)
+    await fetch(`/api/custom-missions?id=${editingMission.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: editForm.title,
+        topic: editForm.topic,
+        description: editForm.description,
+        expectedOutput: editForm.expectedOutput,
+        level: editForm.level,
+      }),
+    })
+    await loadCustomMissions()
+    setEditingMission(null)
+    setSavingEdit(false)
+  }
+
   async function moveCustomMission(id: string, newUnitId: number | null) {
     setMovingId(id)
     try {
@@ -138,6 +171,95 @@ export default function ProblemsPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {/* 추가문제 수정 모달 */}
+      {editingMission && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6"
+          onClick={e => { if (e.target === e.currentTarget) setEditingMission(null) }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between"
+              style={{background:'#4338CA'}}>
+              <h2 className="font-bold text-white">✏️ 추가문제 수정</h2>
+              <button onClick={() => setEditingMission(null)} className="text-white/60 hover:text-white text-xl">×</button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* 난이도 */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">난이도</label>
+                <div className="flex gap-2">
+                  {[{v:1,l:'기초',bg:'#DBEAFE',c:'#2563EB'},{v:2,l:'응용',bg:'#FEF3C7',c:'#D97706'},{v:3,l:'심화',bg:'#FCE7F3',c:'#DB2777'}].map(opt => (
+                    <button key={opt.v} onClick={() => setEditForm(p => ({...p, level: opt.v}))}
+                      className="flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-all"
+                      style={{
+                        background: editForm.level === opt.v ? opt.bg : '#fff',
+                        color: editForm.level === opt.v ? opt.c : '#9CA3AF',
+                        borderColor: editForm.level === opt.v ? opt.c : '#E5E7EB',
+                      }}>
+                      {opt.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 제목 */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">제목</label>
+                <input
+                  value={editForm.title}
+                  onChange={e => setEditForm(p => ({...p, title: e.target.value}))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                  placeholder="문제 제목"
+                />
+              </div>
+
+              {/* 주제 */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">주제/태그</label>
+                <input
+                  value={editForm.topic}
+                  onChange={e => setEditForm(p => ({...p, topic: e.target.value}))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                  placeholder="예: 변수, 조건문, 반복문"
+                />
+              </div>
+
+              {/* 문제 설명 */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">문제 설명</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={e => setEditForm(p => ({...p, description: e.target.value}))}
+                  rows={5}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-400 resize-none"
+                  placeholder="학생에게 보여줄 문제 설명"
+                />
+              </div>
+
+              {/* 예상 출력 */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1.5 block">예상 출력</label>
+                <textarea
+                  value={editForm.expectedOutput}
+                  onChange={e => setEditForm(p => ({...p, expectedOutput: e.target.value}))}
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono outline-none focus:border-indigo-400 resize-none"
+                  placeholder="프로그램 실행 시 기대되는 출력 결과"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-50 flex gap-3">
+              <button onClick={() => setEditingMission(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors">
+                취소
+              </button>
+              <button onClick={saveEdit} disabled={savingEdit || !editForm.title.trim()}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors"
+                style={{background:'#4338CA'}}>
+                {savingEdit ? '저장 중...' : '✅ 저장하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900">📝 문제 관리</h1>
@@ -236,6 +358,11 @@ export default function ProblemsPage() {
                         <option key={u.id} value={u.id}>{u.id}. {u.title}</option>
                       ))}
                     </select>
+                    <button
+                      onClick={() => openEdit(m)}
+                      className="text-xs px-2 py-1 rounded-lg bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-colors flex-shrink-0">
+                      수정
+                    </button>
                     <button
                       onClick={() => deleteCustomMission(m.id)}
                       disabled={deletingId === m.id}
@@ -406,6 +533,11 @@ export default function ProblemsPage() {
                           <option key={u.id} value={u.id}>{u.id}. {u.title}</option>
                         ))}
                       </select>
+                      <button
+                        onClick={() => openEdit(m)}
+                        className="text-xs px-2 py-1 rounded-lg bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-colors">
+                        수정
+                      </button>
                       <button
                         onClick={() => deleteCustomMission(m.id)}
                         disabled={deletingId === m.id}

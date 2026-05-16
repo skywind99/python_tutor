@@ -75,7 +75,28 @@ create policy "교사 로그 읽기" on mission_logs for select using (
   exists (select 1 from profiles where id = auth.uid() and role = 'teacher')
 );
 
--- 6. 주간 랭킹 뷰
+-- 6. xp_logs (예제/연습 XP 기록)
+create table xp_logs (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid references profiles(id) on delete cascade,
+  source_id text not null,  -- 'ex-{unitId}-{index}' 또는 'guided-{unitId}-{index}'
+  xp int not null default 0,
+  created_at timestamptz default now(),
+  unique(student_id, source_id)
+);
+
+alter table xp_logs enable row level security;
+create policy "본인 xp_logs 접근" on xp_logs for all using (student_id = auth.uid());
+create policy "교사 xp_logs 읽기" on xp_logs for select using (
+  exists (select 1 from profiles where id = auth.uid() and role = 'teacher')
+);
+
+-- ※ 기존 DB에 추가할 경우 아래 SQL만 실행:
+-- CREATE TABLE IF NOT EXISTS xp_logs ( ... ) -- 위 정의 참고
+-- profiles에 school 컬럼 추가:
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school text;
+
+-- 7. 주간 랭킹 뷰
 create or replace view weekly_ranking as
 select
   p.id as student_id,

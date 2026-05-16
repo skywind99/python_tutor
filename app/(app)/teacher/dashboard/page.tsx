@@ -15,9 +15,14 @@ function getClient() {
 export default function TeacherDashboard() {
   const router = useRouter()
   const [profile, setProfile] = useState<any>(null)
-  const [classInfo, setClassInfo] = useState<any>(null)
+  const [classes, setClasses] = useState<any[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [students, setStudents] = useState<any[]>([])
+  const [studentsLoading, setStudentsLoading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [newClassName, setNewClassName] = useState('')
+  const [showNewClassInput, setShowNewClassInput] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -29,34 +34,50 @@ export default function TeacherDashboard() {
       if (prof?.role !== 'teacher') { router.push('/dashboard'); return }
       setProfile(prof)
 
-      // 내 반 가져오기
-      const { data: cls } = await sb.from('classes').select('*').eq('teacher_id', user.id).single()
-      setClassInfo(cls)
+      const { data: cls } = await sb.from('classes').select('*').eq('teacher_id', user.id).order('created_at')
+      const classList = cls || []
+      setClasses(classList)
+      if (classList.length > 0) setSelectedClassId(classList[0].id)
 
-
-      if (cls) {
-        const { data: studs } = await sb.from('profiles')
-          .select('id, name, mission_logs(*)')
-          .eq('class_id', cls.id)
-          .eq('role', 'student')
-        setStudents(studs || [])
-      }
       setLoading(false)
     }
     load()
   }, [router])
 
+  useEffect(() => {
+    if (!selectedClassId) { setStudents([]); return }
+    async function loadStudents() {
+      setStudentsLoading(true)
+      const { data: studs } = await getClient().from('profiles')
+        .select('id, name, mission_logs(*)')
+        .eq('class_id', selectedClassId)
+        .eq('role', 'student')
+      setStudents(studs || [])
+      setStudentsLoading(false)
+    }
+    loadStudents()
+  }, [selectedClassId])
+
   async function createClass() {
+    const name = newClassName.trim()
+    if (!name) return
+    setCreating(true)
     const sb = getClient()
     const { data: { user } } = await sb.auth.getUser()
     if (!user) return
     const code = Math.random().toString(36).substring(2, 8).toUpperCase()
     const { data } = await sb.from('classes').insert({
-      name: `${profile?.name}선생님 반`,
+      name,
       teacher_id: user.id,
       invite_code: code
     }).select().single()
-    setClassInfo(data)
+    if (data) {
+      setClasses(prev => [...prev, data])
+      setSelectedClassId(data.id)
+    }
+    setNewClassName('')
+    setShowNewClassInput(false)
+    setCreating(false)
   }
 
   if (loading) return (
@@ -64,6 +85,8 @@ export default function TeacherDashboard() {
       <div className="text-4xl animate-bounce">👨‍🏫</div>
     </div>
   )
+
+  const selectedClass = classes.find(c => c.id === selectedClassId)
 
   // 학생별 통계
   const studentStats = students.map(s => {
@@ -98,34 +121,84 @@ export default function TeacherDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6 space-y-5">
-        {/* 반 정보 */}
-        {!classInfo ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
+
+        {/* 반 탭 선택 */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-400 font-medium mr-1">반 선택</span>
+
+            {classes.map(cls => (
+              <button key={cls.id} onClick={() => setSelectedClassId(cls.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                  selectedClassId === cls.id
+                    ? 'text-white border-indigo-700'
+                    : 'text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
+                }`}
+                style={selectedClassId === cls.id ? {background:'#4338CA'} : {}}>
+                🏫 {cls.name}
+                {selectedClassId === cls.id && (
+                  <span className="text-xs opacity-75 font-mono">{cls.invite_code}</span>
+                )}
+              </button>
+            ))}
+
+            {/* 새 반 만들기 */}
+            {showNewClassInput ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={newClassName}
+                  onChange={e => setNewClassName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') createClass(); if (e.key === 'Escape') { setShowNewClassInput(false); setNewClassName('') } }}
+                  placeholder="반 이름 (예: 1반, 3학년2반)"
+                  className="border border-indigo-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500 w-48"
+                />
+                <button onClick={createClass} disabled={creating || !newClassName.trim()}
+                  className="px-3 py-2 text-sm font-medium text-white rounded-xl disabled:opacity-50 transition-colors"
+                  style={{background:'#4338CA'}}>
+                  {creating ? '생성 중...' : '만들기'}
+                </button>
+                <button onClick={() => { setShowNewClassInput(false); setNewClassName('') }}
+                  className="px-3 py-2 text-sm text-gray-400 hover:text-gray-600">취소</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowNewClassInput(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-indigo-600 border border-dashed border-indigo-300 hover:bg-indigo-50 transition-colors">
+                + 새 반 만들기
+              </button>
+            )}
+          </div>
+
+          {/* 선택된 반 초대코드 */}
+          {selectedClass && (
+            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
+              <span className="text-sm text-gray-600">
+                <span className="font-semibold text-gray-900">{selectedClass.name}</span> · 학생 {students.length}명
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">학생 초대코드</span>
+                <span className="text-sm font-bold font-mono text-gray-900 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
+                  {selectedClass.invite_code}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 반이 없는 경우 */}
+        {classes.length === 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
             <div className="text-4xl mb-3">🏫</div>
             <h2 className="font-semibold text-gray-900 mb-2">반을 만들어보세요</h2>
             <p className="text-sm text-gray-400 mb-5">학생들에게 초대코드를 공유하면 반에 합류할 수 있어요</p>
-            <button onClick={createClass} className="px-6 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors">
-              반 만들기
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-gray-900">{classInfo.name}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">학생 {students.length}명</p>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-400 mb-1">학생 초대코드</div>
-                <div className="text-xl font-bold font-mono text-gray-900 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
-                  {classInfo.invite_code}
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
-        {students.length > 0 && (
+        {studentsLoading && (
+          <div className="text-center py-10 text-gray-400">불러오는 중...</div>
+        )}
+
+        {!studentsLoading && students.length > 0 && (
           <>
             {/* 요약 통계 */}
             <div className="grid grid-cols-4 gap-3">
@@ -157,33 +230,30 @@ export default function TeacherDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {studentStats.map((s, i) => {
-                    const lv = LEVEL_INFO[Number(s.avgHints) > 2 ? 3 : Number(s.avgHints) > 1 ? 2 : 1 as 1|2|3]
-                    return (
-                      <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-sm font-bold text-gray-400">{i+1}</td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">{s.name}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full w-16">
-                              <div className="h-full bg-teal-400 rounded-full" style={{width:`${(s.passed/MISSIONS.length)*100}%`}}/>
-                            </div>
-                            <span className="text-xs text-gray-600">{s.passed}/{MISSIONS.length}</span>
+                  {studentStats.map((s, i) => (
+                    <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-sm font-bold text-gray-400">{i+1}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">{s.name}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full w-16">
+                            <div className="h-full bg-teal-400 rounded-full" style={{width:`${(s.passed/MISSIONS.length)*100}%`}}/>
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-800">{s.totalScore.toLocaleString()}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                            Number(s.avgHints) >= 2 ? 'bg-red-50 text-red-600' :
-                            Number(s.avgHints) >= 1 ? 'bg-yellow-50 text-yellow-700' : 'bg-teal-50 text-teal-700'
-                          }`}>{s.avgHints}개</span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-500">
-                          {Number(s.avgHints) >= 2 ? '힌트 의존도 높음 🔴' : Number(s.avgHints) >= 1 ? '보통 🟡' : '우수 🟢'}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                          <span className="text-xs text-gray-600">{s.passed}/{MISSIONS.length}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-800">{s.totalScore.toLocaleString()}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          Number(s.avgHints) >= 2 ? 'bg-red-50 text-red-600' :
+                          Number(s.avgHints) >= 1 ? 'bg-yellow-50 text-yellow-700' : 'bg-teal-50 text-teal-700'
+                        }`}>{s.avgHints}개</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {Number(s.avgHints) >= 2 ? '힌트 의존도 높음 🔴' : Number(s.avgHints) >= 1 ? '보통 🟡' : '우수 🟢'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -213,6 +283,17 @@ export default function TeacherDashboard() {
               <p className="text-xs text-gray-400 mt-4">🔴 통과율 40% 미만 → 수업에서 집중 지도 필요</p>
             </div>
           </>
+        )}
+
+        {!studentsLoading && selectedClass && students.length === 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+            <div className="text-3xl mb-2">🎓</div>
+            <p className="text-gray-500 text-sm">아직 학생이 없어요</p>
+            <Link href="/teacher/students"
+              className="mt-3 inline-block text-sm text-indigo-600 underline">
+              학생 등록하러 가기
+            </Link>
+          </div>
         )}
       </div>
     </div>

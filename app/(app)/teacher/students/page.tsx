@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { MISSIONS, LEVEL_INFO } from '@/data/missions'
+import { MISSIONS } from '@/data/missions'
 import { Suspense } from 'react'
 
 function getClient() {
@@ -12,10 +12,12 @@ function getClient() {
 function StudentsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [classInfo, setClassInfo] = useState<any>(null)
+  const [classes, setClasses] = useState<any[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [students, setStudents] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [studentsLoading, setStudentsLoading] = useState(false)
   const [tab, setTab] = useState<'list'|'bulk'>(searchParams.get('tab') === 'bulk' ? 'bulk' : 'list')
 
   // 일괄등록
@@ -31,18 +33,30 @@ function StudentsContent() {
       if (!user) { router.push('/login'); return }
       const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).single()
       if (prof?.role !== 'teacher') { router.push('/dashboard'); return }
-      const { data: cls } = await sb.from('classes').select('*').eq('teacher_id', user.id).single()
-      setClassInfo(cls)
-      if (!cls) { setLoading(false); return }
-      const { data: studs } = await sb.from('profiles')
-        .select('id, name, email, created_at, mission_logs(*)')
-        .eq('class_id', cls.id).eq('role', 'student')
-        .order('created_at', { ascending: false })
-      setStudents(studs || [])
+
+      const { data: cls } = await sb.from('classes').select('*').eq('teacher_id', user.id).order('created_at')
+      const classList = cls || []
+      setClasses(classList)
+      if (classList.length > 0) setSelectedClassId(classList[0].id)
       setLoading(false)
     }
     load()
   }, [router])
+
+  useEffect(() => {
+    if (!selectedClassId) { setStudents([]); setSelected(null); return }
+    async function loadStudents() {
+      setStudentsLoading(true)
+      setSelected(null)
+      const { data: studs } = await getClient().from('profiles')
+        .select('id, name, email, created_at, mission_logs(*)')
+        .eq('class_id', selectedClassId).eq('role', 'student')
+        .order('created_at', { ascending: false })
+      setStudents(studs || [])
+      setStudentsLoading(false)
+    }
+    loadStudents()
+  }, [selectedClassId])
 
   async function removeStudent(id: string) {
     if (!confirm('이 학생을 반에서 제거할까요?')) return
@@ -52,7 +66,7 @@ function StudentsContent() {
   }
 
   async function bulkRegister() {
-    if (!bulkText.trim()) return
+    if (!bulkText.trim() || !selectedClassId) return
     setBulkLoading(true); setBulkResults([])
     const lines = bulkText.trim().split('\n').filter(l => l.trim())
     const students = lines.map(line => {
@@ -64,17 +78,14 @@ function StudentsContent() {
       const res = await fetch('/api/bulk-register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students, classId: classInfo?.id })
+        body: JSON.stringify({ students, classId: selectedClassId })
       })
       const data = await res.json()
       setBulkResults(data.results || [])
-      // 성공한 학생들 목록 새로고침
-      if (classInfo) {
-        const { data: studs } = await getClient().from('profiles')
-          .select('id, name, email, created_at, mission_logs(*)')
-          .eq('class_id', classInfo.id).eq('role', 'student')
-        setStudents(studs || [])
-      }
+      const { data: studs } = await getClient().from('profiles')
+        .select('id, name, email, created_at, mission_logs(*)')
+        .eq('class_id', selectedClassId).eq('role', 'student')
+      setStudents(studs || [])
     } catch (e) {
       alert('오류가 발생했어요.')
     }
@@ -98,20 +109,14 @@ function StudentsContent() {
     }
   }
 
+  const selectedClass = classes.find(c => c.id === selectedClassId)
+
+  if (loading) return <div className="p-8 text-center text-gray-400">불러오는 중...</div>
+
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">👥 학생 관리</h1>
-          {classInfo && (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-gray-500">{classInfo.name}</span>
-              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full" style={{background:'#EEF2FF',color:'#4338CA'}}>
-                초대코드: {classInfo.invite_code}
-              </span>
-            </div>
-          )}
-        </div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-bold text-gray-900">👥 학생 관리</h1>
         <div className="flex rounded-xl overflow-hidden border border-gray-200 text-sm">
           {(['list','bulk'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
@@ -123,7 +128,30 @@ function StudentsContent() {
         </div>
       </div>
 
-      {!classInfo ? (
+      {/* 반 선택 탭 */}
+      {classes.length > 0 && (
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <span className="text-xs text-gray-400">반 선택</span>
+          {classes.map(cls => (
+            <button key={cls.id} onClick={() => setSelectedClassId(cls.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                selectedClassId === cls.id
+                  ? 'text-white border-indigo-700'
+                  : 'text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
+              }`}
+              style={selectedClassId === cls.id ? {background:'#4338CA'} : {}}>
+              🏫 {cls.name}
+            </button>
+          ))}
+          {selectedClass && (
+            <span className="text-xs font-mono font-semibold px-2 py-1 rounded-full ml-1" style={{background:'#EEF2FF',color:'#4338CA'}}>
+              초대코드: {selectedClass.invite_code}
+            </span>
+          )}
+        </div>
+      )}
+
+      {classes.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
           <div className="text-4xl mb-3">🏫</div>
           <p className="text-gray-500">대시보드에서 반을 먼저 만들어주세요</p>
@@ -132,9 +160,9 @@ function StudentsContent() {
         <div className="flex gap-5">
           <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="px-5 py-3 text-white text-sm font-semibold" style={{background:'#4338CA'}}>
-              전체 학생 목록
+              {selectedClass?.name} · 전체 학생 목록
             </div>
-            {loading ? (
+            {studentsLoading ? (
               <div className="p-8 text-center text-gray-400">불러오는 중...</div>
             ) : students.length === 0 ? (
               <div className="p-8 text-center">
@@ -205,17 +233,13 @@ function StudentsContent() {
                           <div className="space-y-1 max-h-52 overflow-y-auto">
                             {MISSIONS.map(m => {
                               const log = logs.find((l: any) => l.mission_id === m.id)
-                              const lv = LEVEL_INFO[m.level as 1|2|3]
                               return (
                                 <div key={m.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-gray-50">
                                   <div className="flex items-center gap-1.5 min-w-0">
                                     <span>{log?.passed ? '✅' : '⬜'}</span>
                                     <span className="text-gray-700 truncate">{m.title}</span>
                                   </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    <span className="px-1.5 py-0.5 rounded-full" style={{background:lv.bg,color:lv.text}}>{lv.label}</span>
-                                    {log && <span className="text-gray-400">{log.score}점</span>}
-                                  </div>
+                                  {log && <span className="text-gray-400 flex-shrink-0">{log.score}점</span>}
                                 </div>
                               )
                             })}
@@ -237,7 +261,14 @@ function StudentsContent() {
         /* 일괄 등록 탭 */
         <div className="space-y-5">
           <div className="bg-white rounded-2xl border border-gray-100 p-6">
-            <h2 className="font-semibold text-gray-900 mb-2">📋 학생 일괄 등록</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-900">📋 학생 일괄 등록</h2>
+              {selectedClass && (
+                <span className="text-sm font-medium px-3 py-1 rounded-full" style={{background:'#EEF2FF',color:'#4338CA'}}>
+                  등록 대상: {selectedClass.name}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500 mb-4">
               한 줄에 한 명씩 <code className="bg-gray-100 px-1 rounded text-xs">이름, 이메일</code> 형식으로 입력하세요.<br/>
               이메일 생략 시 <code className="bg-gray-100 px-1 rounded text-xs">이름@school.kr</code>로 자동 생성돼요.<br/>
@@ -267,7 +298,7 @@ function StudentsContent() {
               <span className="text-xs text-gray-400">
                 {bulkText.trim() ? bulkText.trim().split('\n').filter(l=>l.trim()).length + '명 입력됨' : ''}
               </span>
-              <button onClick={bulkRegister} disabled={bulkLoading || !bulkText.trim()}
+              <button onClick={bulkRegister} disabled={bulkLoading || !bulkText.trim() || !selectedClassId}
                 className="px-6 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors"
                 style={{background:'#4338CA'}}>
                 {bulkLoading ? '등록 중...' : '✅ 일괄 등록하기'}
@@ -301,15 +332,9 @@ function StudentsContent() {
                 </div>
                 {bulkResults.some(r=>r.success) && (
                   <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
-                    ⚠️ 초기 비밀번호 <strong>python1234</strong>를 학생들에게 알려주세요. 학생들이 직접 변경하도록 안내해주세요.
+                    ⚠️ 초기 비밀번호 <strong>python1234</strong>를 학생들에게 알려주세요.
                   </div>
                 )}
-              </div>
-            )}
-
-            {!process.env.NEXT_PUBLIC_SUPABASE_URL && (
-              <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
-                ⚠️ 일괄 등록을 사용하려면 Vercel 환경변수에 <code>SUPABASE_SERVICE_ROLE_KEY</code>를 추가해야 해요.
               </div>
             )}
           </div>

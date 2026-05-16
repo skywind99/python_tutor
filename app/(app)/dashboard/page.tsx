@@ -12,12 +12,39 @@ function getClient() {
   )
 }
 
+const PLAYER_LEVELS = [
+  { level: 1, title: '파이썬 씨앗',   emoji: '🌱', minXP: 0    },
+  { level: 2, title: '파이썬 새싹',   emoji: '🪴', minXP: 100  },
+  { level: 3, title: '파이썬 탐험가', emoji: '🔭', minXP: 300  },
+  { level: 4, title: '파이썬 개발자', emoji: '💻', minXP: 600  },
+  { level: 5, title: '파이썬 마스터', emoji: '⚡', minXP: 1000 },
+  { level: 6, title: '파이썬 마법사', emoji: '🧙', minXP: 1500 },
+  { level: 7, title: '파이썬 레전드', emoji: '🏆', minXP: 2500 },
+]
+
+function getLevelInfo(xp: number) {
+  let current = PLAYER_LEVELS[0]
+  let next: typeof PLAYER_LEVELS[0] | null = PLAYER_LEVELS[1]
+  for (let i = PLAYER_LEVELS.length - 1; i >= 0; i--) {
+    if (xp >= PLAYER_LEVELS[i].minXP) {
+      current = PLAYER_LEVELS[i]
+      next = PLAYER_LEVELS[i + 1] ?? null
+      break
+    }
+  }
+  const pct = next
+    ? Math.min(100, Math.round(((xp - current.minXP) / (next.minXP - current.minXP)) * 100))
+    : 100
+  return { current, next, pct }
+}
+
 export default function StudentDashboard() {
   const router = useRouter()
   const [profile, setProfile] = useState<any>(null)
   const [logs, setLogs] = useState<any[]>([])
   const [ranking, setRanking] = useState<any[]>([])
   const [customMissions, setCustomMissions] = useState<any[]>([])
+  const [bonusXP, setBonusXP] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,6 +61,11 @@ export default function StudentDashboard() {
         .select('*').eq('student_id', user.id)
       setLogs(missionLogs || [])
 
+      // 예제/연습 XP 로드
+      const { data: xpLogs } = await sb.from('xp_logs')
+        .select('xp').eq('student_id', user.id)
+      setBonusXP((xpLogs || []).reduce((s: number, l: any) => s + (l.xp || 0), 0))
+
       if (prof?.class_id) {
         const { data: rank } = await sb.from('profiles')
           .select('id, name, mission_logs(score)')
@@ -41,7 +73,7 @@ export default function StudentDashboard() {
           .eq('role', 'student')
         setRanking(rank || [])
       }
-      // 선생님이 추가한 문제
+
       const cmRes = await fetch('/api/custom-missions')
       const cmData = await cmRes.json()
       setCustomMissions(cmData.missions || [])
@@ -61,9 +93,11 @@ export default function StudentDashboard() {
   )
 
   const passedMissions = logs.filter(l => l.passed)
-  const totalScore = logs.reduce((sum, l) => sum + (l.score || 0), 0)
+  const missionScore = logs.reduce((sum, l) => sum + (l.score || 0), 0)
+  const totalXP = missionScore + bonusXP
   const totalMissions = MISSIONS.length
   const progressPct = Math.round((passedMissions.length / totalMissions) * 100)
+  const levelInfo = getLevelInfo(totalXP)
 
   // 단원별 진행도
   const unitProgress = UNITS.map(unit => {
@@ -72,7 +106,7 @@ export default function StudentDashboard() {
     return { ...unit, passed: unitPassed.length, total: unitMissions.length }
   })
 
-  // 랭킹 계산
+  // 랭킹 계산 (미션 점수 기준)
   const rankData = ranking.map((r: any) => ({
     name: r.name,
     score: (r.mission_logs || []).reduce((s: number, l: any) => s + (l.score || 0), 0)
@@ -91,17 +125,55 @@ export default function StudentDashboard() {
       <div className="max-w-6xl mx-auto p-6 space-y-5">
         {/* 상단 stats */}
         <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: '총 점수', value: totalScore.toLocaleString(), icon: '💎', sub: '획득한 보석' },
-            { label: '완료한 미션', value: `${passedMissions.length}/${totalMissions}`, icon: '🎯', sub: `진행률 ${progressPct}%` },
-            { label: '반 내 순위', value: myRank > 0 ? `${myRank}위` : '-', icon: '🏆', sub: ranking.length > 0 ? `${ranking.length}명 중` : '반 미배정' },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="text-2xl mb-2">{s.icon}</div>
-              <div className="text-2xl font-bold text-gray-900 mb-0.5">{s.value}</div>
-              <div className="text-xs text-gray-400">{s.sub}</div>
+          {/* 레벨 카드 */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-2xl">{levelInfo.current.emoji}</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                Lv.{levelInfo.current.level}
+              </span>
             </div>
-          ))}
+            <div className="text-lg font-bold text-gray-900 mb-0.5">{levelInfo.current.title}</div>
+            <div className="text-xs text-gray-400 mb-2">
+              {totalXP.toLocaleString()} XP
+              {levelInfo.next && ` / ${levelInfo.next.minXP.toLocaleString()} XP`}
+            </div>
+            {/* XP 게이지 */}
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${levelInfo.pct}%`,
+                  background: 'linear-gradient(90deg, #3B82F6, #06B6D4)'
+                }}
+              />
+            </div>
+            {levelInfo.next ? (
+              <div className="text-xs text-gray-400 mt-1">
+                다음: {levelInfo.next.emoji} {levelInfo.next.title} ({levelInfo.pct}%)
+              </div>
+            ) : (
+              <div className="text-xs text-amber-500 mt-1 font-medium">최고 등급 달성! 🏆</div>
+            )}
+          </div>
+
+          {/* 완료한 미션 */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-2xl mb-2">🎯</div>
+            <div className="text-2xl font-bold text-gray-900 mb-0.5">{passedMissions.length}/{totalMissions}</div>
+            <div className="text-xs text-gray-400">진행률 {progressPct}%</div>
+          </div>
+
+          {/* 반 내 순위 */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="text-2xl mb-2">🏆</div>
+            <div className="text-2xl font-bold text-gray-900 mb-0.5">
+              {myRank > 0 ? `${myRank}위` : '-'}
+            </div>
+            <div className="text-xs text-gray-400">
+              {ranking.length > 0 ? `${ranking.length}명 중` : '반 미배정'}
+            </div>
+          </div>
         </div>
 
         {/* 전체 진행도 바 */}

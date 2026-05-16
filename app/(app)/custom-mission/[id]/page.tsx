@@ -2,7 +2,13 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { createBrowserClient } from '@supabase/ssr'
+
+const DotLottie = dynamic(
+  () => import('@lottiefiles/dotlottie-react').then(m => ({ default: m.DotLottieReact })),
+  { ssr: false }
+)
 
 declare global { interface Window { Sk: any } }
 
@@ -22,12 +28,14 @@ export default function CustomMissionPage() {
   const [diffMsg, setDiffMsg] = useState('')
   const [running, setRunning] = useState(false)
   const [pyReady, setPyReady] = useState(false)
-  const [tab, setTab] = useState<'output' | 'hint'>('output')
   const [chatMessages, setChatMessages] = useState<{ role: 'ai' | 'user'; text: string }[]>([])
   const [chatInput, setChatInput] = useState('')
   const [hintLoading, setHintLoading] = useState(false)
+  const [hintCount, setHintCount] = useState(0)
   const [passed, setPassed] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [showSuccessLottie, setShowSuccessLottie] = useState(false)
+  const [showErrorLottie, setShowErrorLottie] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = useCallback(() => {
@@ -50,7 +58,6 @@ export default function CustomMissionPage() {
       const { data: { user } } = await sb.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUserId(user.id)
-
       const { data } = await sb.from('custom_missions').select('*').eq('id', id).single()
       if (!data) { router.push('/dashboard'); return }
       setMission(data)
@@ -61,7 +68,7 @@ export default function CustomMissionPage() {
 
   const runCode = async () => {
     if (!pyReady || running || !mission) return
-    setRunning(true); setTab('output')
+    setRunning(true)
     const Sk = window.Sk
     const inputs = (mission.default_input || '').split(',').map((s: string) => s.trim())
     let out = ''; let inputIdx = 0
@@ -85,11 +92,16 @@ export default function CustomMissionPage() {
           const wi = exp.findIndex((l, i) => l !== act[i])
           if (wi >= 0) setDiffMsg(`${wi + 1}번째 줄 → 예상: "${exp[wi]}" / 출력: "${act[wi] || '없음'}"`)
         }
-      } else {
+        setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
+      } else if (!passed) {
         setPassed(true)
+        setShowSuccessLottie(true)
+        setTimeout(() => setShowSuccessLottie(false), 3500)
       }
     } catch (e: any) {
-      setOutput(String(e).replace(/^.*?Error:/, '오류:')); setOutputOk(false)
+      setOutput(String(e).replace(/^.*?Error:/, '오류:'))
+      setOutputOk(false)
+      setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
     }
     setRunning(false)
   }
@@ -97,7 +109,7 @@ export default function CustomMissionPage() {
   const sendChat = async (message: string) => {
     if (hintLoading || !mission) return
     const userMsg = message.trim()
-    setHintLoading(true); setTab('hint')
+    setHintLoading(true)
     if (userMsg) setChatMessages(prev => [...prev, { role: 'user', text: userMsg }])
     setChatInput('')
     setTimeout(scrollToBottom, 50)
@@ -116,6 +128,7 @@ export default function CustomMissionPage() {
       })
       const data = await res.json()
       setChatMessages(prev => [...prev, { role: 'ai', text: data.hint || data.error || '응답을 받지 못했어요.' }])
+      setHintCount(c => Math.min(c + 1, 5))
     } catch {
       setChatMessages(prev => [...prev, { role: 'ai', text: '힌트를 불러오지 못했어요.' }])
     }
@@ -124,126 +137,258 @@ export default function CustomMissionPage() {
   }
 
   if (!mission) return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d1117' }}>
       <div className="text-4xl animate-bounce">⏳</div>
     </div>
   )
 
   const levelLabel = ['', '기초', '응용', '심화'][mission.level] || '응용'
+  const levelColors: Record<string, { bg: string; text: string }> = {
+    '기초': { bg: 'rgba(63,185,80,0.15)', text: '#3fb950' },
+    '응용': { bg: 'rgba(249,115,22,0.15)', text: '#fb923c' },
+    '심화': { bg: 'rgba(248,81,73,0.15)', text: '#f85149' },
+  }
+  const lv = levelColors[levelLabel] || levelColors['응용']
 
   return (
-    <div className="flex bg-gray-50 overflow-hidden" style={{height:'calc(100vh - 3.5rem)'}}>
-      {/* Sidebar */}
-      <div className="w-52 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 p-4 space-y-3">
-        <Link href="/dashboard" className="text-xs text-gray-400 hover:text-gray-600">← 대시보드</Link>
-        <div className="bg-indigo-50 rounded-xl p-3">
-          <div className="text-xs text-indigo-400 mb-1">선생님 추가 문제</div>
-          <div className="text-sm font-semibold text-gray-800">{mission.title}</div>
-          <div className="text-xs text-indigo-500 mt-1">{levelLabel} · {mission.topic}</div>
-        </div>
-        {passed && (
-          <div className="bg-teal-50 rounded-xl p-3 text-center">
-            <div className="text-2xl mb-1">🎉</div>
-            <div className="text-xs font-semibold text-teal-600">미션 완료!</div>
-          </div>
-        )}
-      </div>
+    <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 3.5rem)', background: '#0d1117' }}>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Problem */}
-        <div className="bg-white border-b border-gray-100 p-4 overflow-y-auto flex-[2] min-h-0">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-semibold text-gray-900">{mission.title}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">{levelLabel}</span>
-            {passed && <span className="text-xs text-teal-600 font-semibold ml-auto">✓ 완료!</span>}
-          </div>
-          <pre className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">{mission.description}</pre>
-        </div>
-
-        {/* Output/Hint tabs */}
-        <div className="bg-white border-b border-gray-100 flex flex-col flex-[2] min-h-0">
-          <div className="flex border-b border-gray-100 flex-shrink-0">
-            {(['output', 'hint'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${tab === t ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                {t === 'output' ? '실행 결과' : 'AI 튜터'}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 overflow-y-auto p-3">
-            {tab === 'output' ? (
-              output ? (
-                <div>
-                  <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap mb-2">{output}</pre>
-                  {outputOk === true && <div className="text-xs text-teal-600 font-semibold">✓ 정답!</div>}
-                  {outputOk === false && (
-                    <div>
-                      <div className="text-xs text-red-500 font-semibold mb-1">✗ 아직 아니에요</div>
-                      {diffMsg && <div className="text-xs text-red-400 bg-red-50 rounded p-2">{diffMsg}</div>}
-                    </div>
-                  )}
-                </div>
-              ) : <div className="text-xs text-gray-400 text-center mt-6">실행 버튼을 눌러보세요</div>
-            ) : (
-              <div className="flex flex-col h-full">
-                <div className="flex-1 overflow-y-auto space-y-2 pb-1">
-                  {chatMessages.length === 0 && !hintLoading && (
-                    <div className="text-xs text-gray-400 text-center mt-4 leading-relaxed">
-                      💬 AI 튜터에게 물어보세요
-                    </div>
-                  )}
-                  {chatMessages.map((m, i) => (
-                    <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
-                        m.role === 'user' ? 'bg-blue-500 text-white rounded-br-sm' : 'bg-gray-100 text-gray-700 rounded-bl-sm'
-                      }`}>{m.text}</div>
-                    </div>
-                  ))}
-                  {hintLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-gray-400 flex items-center gap-1">
-                        <span className="animate-bounce">●</span>
-                        <span className="animate-bounce" style={{ animationDelay: '0.15s' }}>●</span>
-                        <span className="animate-bounce" style={{ animationDelay: '0.3s' }}>●</span>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              </div>
+      {/* ── 사이드바 ── */}
+      <div className="w-52 flex flex-col overflow-y-auto flex-shrink-0" style={{ background: '#161b22', borderRight: '1px solid #30363d' }}>
+        <div className="p-4" style={{ borderBottom: '1px solid #30363d' }}>
+          <Link href="/dashboard" className="text-xs hover:opacity-80 mb-2 block transition-opacity" style={{ color: '#8b949e' }}>← 대시보드</Link>
+          <div className="text-xs font-semibold mb-0.5" style={{ color: '#a78bfa' }}>✨ 추가문제</div>
+          <div className="font-semibold text-sm text-white mt-1">{mission.title}</div>
+          <div className="mt-2">
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: lv.bg, color: lv.text }}>
+              {levelLabel}
+            </span>
+            {mission.topic && (
+              <span className="text-xs ml-1.5" style={{ color: '#8b949e' }}>{mission.topic}</span>
             )}
           </div>
         </div>
 
-        {/* Code editor */}
-        <div className="flex-[3] flex flex-col min-h-0">
-          <textarea value={code} onChange={e => setCode(e.target.value)}
-            className="flex-1 p-4 font-mono text-sm text-gray-800 bg-gray-50 border-none outline-none resize-none overflow-auto" spellCheck={false} />
+        {mission.unit_id && (
+          <div className="p-3" style={{ borderBottom: '1px solid #21262d' }}>
+            <Link href={`/learn/${mission.unit_id}/missions`}
+              className="text-xs hover:opacity-80 transition-opacity block"
+              style={{ color: '#58a6ff' }}>
+              ← 단원 미션으로 돌아가기
+            </Link>
+          </div>
+        )}
+
+        {passed && (
+          <div className="m-3 rounded-xl p-3 text-center" style={{ background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)' }}>
+            <div className="text-2xl mb-1">🎉</div>
+            <div className="text-xs font-semibold" style={{ color: '#3fb950' }}>미션 완료!</div>
+          </div>
+        )}
+
+        {mission.hints && mission.hints.length > 0 && (
+          <div className="p-3">
+            <div className="text-xs font-semibold mb-2" style={{ color: '#8b949e' }}>💡 힌트</div>
+            <div className="space-y-1.5">
+              {mission.hints.map((h: string, i: number) => (
+                <div key={i} className="text-xs rounded-lg px-2.5 py-2" style={{ background: 'rgba(255,255,255,0.04)', color: '#c9d1d9' }}>
+                  {i + 1}. {h}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 메인: 좌우 분할 ── */}
+      <div className="flex-1 flex overflow-hidden min-w-0">
+
+        {/* ── 좌측 패널: 문제 설명 + AI 채팅 ── */}
+        <div className="flex flex-col overflow-hidden flex-shrink-0" style={{ width: '42%', background: '#ffffff', borderRight: '1px solid #e5e7eb' }}>
+
+          {/* 문제 설명 */}
+          <div className="overflow-y-auto p-5" style={{ flex: '3 1 0%', minHeight: 0, borderBottom: '1px solid #e5e7eb' }}>
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="font-bold text-gray-900 text-sm">{mission.title}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: lv.bg, color: lv.text }}>
+                {levelLabel}
+              </span>
+              {passed && (
+                <span className="text-xs font-semibold ml-auto" style={{ color: '#059669' }}>✓ 완료!</span>
+              )}
+            </div>
+            {mission.topic && (
+              <div className="flex gap-1 flex-wrap mb-3">
+                <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: '#f3f4f6', color: '#6b7280' }}>{mission.topic}</span>
+              </div>
+            )}
+            <pre className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">{mission.description}</pre>
+            {mission.expected_output && (
+              <div className="mt-4 rounded-xl px-3 py-2.5" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: '#059669' }}>📋 예상 출력</div>
+                <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: '#047857' }}>{mission.expected_output}</pre>
+              </div>
+            )}
+          </div>
+
+          {/* AI 튜터 채팅 */}
+          <div className="flex flex-col overflow-hidden" style={{ flex: '4 1 0%', minHeight: 0, background: '#f9fafb' }}>
+            <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{ background: 'white', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ width: 36, height: 36, flexShrink: 0 }}>
+                <DotLottie src="/lottie/animation/Live chatbot.lottie" loop autoplay />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-gray-700">AI 튜터</div>
+                {hintCount > 0 && (
+                  <div className="text-xs" style={{ color: '#9ca3af' }}>힌트 {hintCount}회 사용</div>
+                )}
+              </div>
+              {hintLoading && (
+                <span className="text-xs animate-pulse" style={{ color: '#6366f1' }}>생각 중...</span>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+              {chatMessages.length === 0 && !hintLoading && (
+                <div className="text-center mt-6 leading-relaxed">
+                  <div className="text-2xl mb-2">💬</div>
+                  <p className="text-xs" style={{ color: '#9ca3af' }}>AI 튜터에게 질문하거나<br />코드를 분석 받아보세요!</p>
+                </div>
+              )}
+              {chatMessages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'text-white rounded-br-sm' : 'text-gray-700 rounded-bl-sm'}`}
+                    style={m.role === 'user'
+                      ? { background: '#2563eb' }
+                      : { background: 'white', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+                    }>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              {hintLoading && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl rounded-bl-sm px-3 py-2 text-xs flex items-center gap-1"
+                    style={{ background: 'white', border: '1px solid #e5e7eb', color: '#9ca3af' }}>
+                    <span className="animate-bounce">●</span>
+                    <span className="animate-bounce" style={{ animationDelay: '0.15s' }}>●</span>
+                    <span className="animate-bounce" style={{ animationDelay: '0.3s' }}>●</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="p-2 flex gap-1.5 flex-shrink-0 items-center" style={{ background: 'white', borderTop: '1px solid #e5e7eb' }}>
+              <div style={{ width: 28, height: 28, flexShrink: 0 }}>
+                <DotLottie src="/lottie/animation/Flirting Dog.lottie" loop autoplay />
+              </div>
+              <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
+                className="px-2.5 py-2 text-xs rounded-lg border transition-colors disabled:opacity-40 whitespace-nowrap font-medium"
+                style={{ borderColor: '#e5e7eb', color: '#374151' }}>
+                💡 분석
+              </button>
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
+                placeholder="질문하세요..."
+                className="flex-1 text-xs border rounded-lg px-3 py-2 outline-none min-w-0"
+                style={{ borderColor: '#e5e7eb' }}
+                disabled={hintLoading}
+              />
+              <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
+                className="px-3 py-2 text-xs font-semibold text-white rounded-lg transition-colors disabled:opacity-40"
+                style={{ background: '#2563eb' }}>
+                전송
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* 하단 고정 버튼바 */}
-        <div className="bg-white border-t border-gray-100 px-4 py-2.5 flex gap-2 items-center flex-none">
-          <button onClick={runCode} disabled={!pyReady || running}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
-            {running ? '실행 중...' : '▶ 실행'}
-          </button>
-          <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors">
-            💡 분석
-          </button>
-          <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
-            placeholder="AI 튜터에게 질문..."
-            className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-300"
-            disabled={hintLoading} />
-          <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
-            className="px-3 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-40">
-            전송
-          </button>
-          <div className="text-xs text-gray-400">{pyReady ? '🟢' : '⏳'}</div>
+        {/* ── 우측 패널: 코드 에디터 + 실행 결과 ── */}
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{ background: '#0d1117' }}>
+
+          {/* 코드 에디터 헤더 */}
+          <div className="flex items-center justify-between px-4 py-2 flex-shrink-0"
+            style={{ background: '#161b22', borderBottom: '1px solid #30363d' }}>
+            <span className="text-xs font-mono" style={{ color: '#8b949e' }}>Python</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs" style={{ color: pyReady ? '#3fb950' : '#8b949e' }}>
+                {pyReady ? '● 준비됨' : '● 로딩 중...'}
+              </span>
+              <button onClick={runCode} disabled={!pyReady || running}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-40 active:scale-95"
+                style={{ background: running ? '#1f6feb' : '#238636', color: '#ffffff' }}>
+                {running ? '⏳ 실행 중...' : '▶  실행'}
+              </button>
+            </div>
+          </div>
+
+          {/* 코드 textarea */}
+          <textarea
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            className="p-4 font-mono text-sm border-none outline-none resize-none overflow-auto"
+            style={{
+              flex: '5 1 0%', minHeight: 0,
+              background: '#0d1117',
+              color: '#e6edf3',
+              caretColor: '#e6edf3',
+              lineHeight: '1.7',
+              tabSize: 4,
+            }}
+            spellCheck={false}
+          />
+
+          {/* 실행 결과 영역 */}
+          <div className="flex flex-col overflow-hidden" style={{ flex: '3 1 0%', minHeight: 0, background: '#161b22', borderTop: '1px solid #30363d' }}>
+            <div className="flex items-center gap-3 px-4 py-2 flex-shrink-0" style={{ borderBottom: '1px solid #21262d' }}>
+              <span className="text-xs font-semibold" style={{ color: '#8b949e' }}>실행 결과</span>
+              {outputOk === true && (
+                <span className="text-xs font-bold" style={{ color: '#3fb950' }}>✓ 정답!</span>
+              )}
+              {outputOk === false && (
+                <span className="text-xs font-bold" style={{ color: '#f85149' }}>✗ 아직 아니에요</span>
+              )}
+              {showErrorLottie && (
+                <div className="ml-auto" style={{ width: 40, height: 40 }}>
+                  <DotLottie src="/lottie/animation/Cat Crying emojiSticker animation.lottie" loop autoplay />
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
+              {output ? (
+                <div>
+                  <pre className="text-xs font-mono whitespace-pre-wrap mb-2" style={{ color: '#c9d1d9' }}>{output}</pre>
+                  {outputOk === false && diffMsg && (
+                    <div className="text-xs rounded-lg px-3 py-2 mt-2"
+                      style={{ background: 'rgba(248,81,73,0.1)', color: '#f85149', border: '1px solid rgba(218,54,51,0.4)' }}>
+                      {diffMsg}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center mt-6">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <p className="text-xs" style={{ color: '#6e7681' }}>▶ 실행 버튼을 눌러 결과를 확인하세요</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* ── 성공 오버레이 ── */}
+      {showSuccessLottie && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{ background: 'rgba(0,0,0,0.18)' }}>
+          <div style={{ width: 320, height: 320 }}>
+            <DotLottie src="/lottie/animation/Cute Mascot Jumping Character.lottie" loop={false} autoplay />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

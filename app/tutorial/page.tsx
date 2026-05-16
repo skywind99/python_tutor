@@ -111,7 +111,7 @@ function FillBlankPage({ page, onPass }: { page: TutorialPage; onPass: () => voi
   const renderCode = () => {
     if (!page.codeTemplate) return null
     let blankIdx = 0
-    const parts = page.codeTemplate.split(/\[___(?:\d+)?___\]/)
+    const parts = page.codeTemplate.split(/\[___(?:\d+___)?\]/)
     return parts.map((part, i) => {
       const currentIdx = blankIdx
       const inputEl = i < parts.length - 1 ? (

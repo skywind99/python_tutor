@@ -25,9 +25,26 @@ export default function UnitCustomMissionsPage() {
   const levelColor = (l: number) => (['', '#2563EB', '#D97706', '#DB2777'][l] || '#6B7280')
 
   return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <Link href="/learn" className="hover:text-gray-600">단원 목록</Link>
+            <span>›</span>
+            <span className="text-gray-900 font-semibold">단원 {unitId}: {unit?.title}</span>
+          </div>
+          <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
+            <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
+            <Link href={`/learn/${unitId}/examples`} className="px-3 py-2 text-gray-400 hover:text-gray-600">💻 예제</Link>
+            <Link href={`/learn/${unitId}/guided`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✏️ 연습</Link>
+            <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
+            <span className="px-3 py-2 bg-white text-purple-700 shadow-sm font-medium">✨ 추가</span>
+          </div>
+        </div>
+      </div>
+
     <div className="max-w-2xl mx-auto p-6">
       <div className="mb-5">
-        <Link href="/learn" className="text-xs text-gray-400 hover:text-gray-600">← 단원별 학습</Link>
         <h1 className="text-lg font-bold text-gray-900 mt-2">{unit?.title} · 추가문제</h1>
         <p className="text-sm text-gray-400 mt-0.5">선생님이 추가한 문제예요</p>
       </div>
@@ -60,6 +77,7 @@ export default function UnitCustomMissionsPage() {
           ))}
         </div>
       )}
+    </div>
     </div>
   )
 }

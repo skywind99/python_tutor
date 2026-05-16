@@ -1,9 +1,14 @@
 'use client'
 import { useParams } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { UNITS } from '@/data/missions'
 import { UNIT_GUIDED } from '@/data/guided'
+import { createBrowserClient } from '@supabase/ssr'
+
+function getClient() {
+  return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+}
 
 export default function GuidedPage() {
   const params = useParams()
@@ -18,6 +23,29 @@ export default function GuidedPage() {
   const [showHint, setShowHint] = useState(false)
   const [done, setDone] = useState(false)
   const [earnedXP, setEarnedXP] = useState(0)
+  const [completedSet, setCompletedSet] = useState<Set<number>>(new Set())
+  const userIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    async function init() {
+      const sb = getClient()
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) return
+      userIdRef.current = user.id
+
+      // 기존에 완료한 문제 로드
+      const { data: logs } = await sb.from('xp_logs')
+        .select('source_id, xp')
+        .eq('student_id', user.id)
+        .like('source_id', `guided-${unitId}-%`)
+      if (logs && logs.length > 0) {
+        const earned = new Set(logs.map((l: any) => parseInt(l.source_id.split('-')[2])))
+        setCompletedSet(earned)
+        setEarnedXP(logs.reduce((s: number, l: any) => s + (l.xp || 0), 0))
+      }
+    }
+    init()
+  }, [unitId])
 
   if (!unit || !guided) return (
     <div className="min-h-screen flex items-center justify-center text-gray-400">단원을 찾을 수 없어요</div>
@@ -77,13 +105,25 @@ export default function GuidedPage() {
     return elements
   }
 
-  function checkAnswer() {
+  async function checkAnswer() {
     const allCorrect = ex.answer.every((ans, i) => (inputs[i] || '').trim() === ans)
     setChecked(true)
     setCorrect(allCorrect)
-    if (allCorrect) {
+
+    if (allCorrect && !completedSet.has(exIdx)) {
       const xp = showHint ? 5 : 10
       setEarnedXP(prev => prev + xp)
+      setCompletedSet(prev => new Set([...prev, exIdx]))
+
+      // Supabase에 XP 저장
+      if (userIdRef.current) {
+        const sb = getClient()
+        await sb.from('xp_logs').upsert({
+          student_id: userIdRef.current,
+          source_id: `guided-${unitId}-${exIdx}`,
+          xp
+        }, { onConflict: 'student_id,source_id', ignoreDuplicates: true })
+      }
     }
   }
 
@@ -111,7 +151,7 @@ export default function GuidedPage() {
           </p>
           <div className="bg-teal-50 rounded-xl p-4 mb-6">
             <div className="text-2xl font-bold text-teal-700">+{earnedXP} XP</div>
-            <div className="text-xs text-teal-500 mt-0.5">획득한 경험치</div>
+            <div className="text-xs text-teal-500 mt-0.5">획득한 경험치 (대시보드에 반영돼요)</div>
           </div>
           <Link href={`/learn/${unitId}/missions`}
             className="block w-full py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors mb-3">
@@ -127,6 +167,7 @@ export default function GuidedPage() {
   }
 
   const progress = ((exIdx) / exercises.length) * 100
+  const alreadyDone = completedSet.has(exIdx)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -138,11 +179,19 @@ export default function GuidedPage() {
             <span className="text-gray-200">|</span>
             <span className="font-semibold text-gray-900 text-sm">단원 {unitId}: {unit.title}</span>
           </div>
-          <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
-            <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
-            <Link href={`/learn/${unitId}/examples`} className="px-3 py-2 text-gray-400 hover:text-gray-600">💻 예제</Link>
-            <span className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">✏️ 연습</span>
-            <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
+          <div className="flex items-center gap-3">
+            {earnedXP > 0 && (
+              <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-semibold">
+                💎 {earnedXP} XP 획득
+              </span>
+            )}
+            <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
+              <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
+              <Link href={`/learn/${unitId}/examples`} className="px-3 py-2 text-gray-400 hover:text-gray-600">💻 예제</Link>
+              <span className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">✏️ 연습</span>
+              <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
+              <Link href={`/learn/${unitId}/custom-missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✨ 추가</Link>
+            </div>
           </div>
         </div>
       </div>
@@ -161,13 +210,18 @@ export default function GuidedPage() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
             <div>
-              <div className="text-xs text-blue-500 font-semibold mb-0.5">연습 {exIdx + 1}</div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="text-xs text-blue-500 font-semibold">연습 {exIdx + 1}</div>
+                {alreadyDone && (
+                  <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-full font-medium">✓ 완료</span>
+                )}
+              </div>
               <h2 className="font-bold text-gray-900">{ex.title}</h2>
             </div>
             <div className="flex items-center gap-1">
               {exercises.map((_, i) => (
                 <div key={i} className={`w-2 h-2 rounded-full transition-colors ${
-                  i < exIdx ? 'bg-teal-400' : i === exIdx ? 'bg-blue-500' : 'bg-gray-200'
+                  completedSet.has(i) ? 'bg-teal-400' : i === exIdx ? 'bg-blue-500' : 'bg-gray-200'
                 }`} />
               ))}
             </div>
@@ -197,7 +251,7 @@ export default function GuidedPage() {
               <button
                 onClick={() => setShowHint(!showHint)}
                 className="text-xs text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1 transition-colors">
-                💡 {showHint ? '힌트 숨기기' : '힌트 보기 (-5 XP)'}
+                💡 {showHint ? '힌트 숨기기' : `힌트 보기 (${alreadyDone ? '이미 완료' : '-5 XP'})`}
               </button>
               {showHint && (
                 <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
@@ -211,7 +265,9 @@ export default function GuidedPage() {
               <div className={`rounded-xl px-4 py-3 text-sm font-medium ${
                 correct ? 'bg-teal-50 text-teal-800 border border-teal-200' : 'bg-red-50 text-red-700 border border-red-200'
               }`}>
-                {correct ? `✅ ${ex.successMsg}` : '❌ 아직 틀렸어요. 다시 생각해보세요!'}
+                {correct
+                  ? `✅ ${ex.successMsg}${!alreadyDone ? (showHint ? ' (+5 XP)' : ' (+10 XP)') : ''}`
+                  : '❌ 아직 틀렸어요. 다시 생각해보세요!'}
               </div>
             )}
 

@@ -93,8 +93,19 @@ export async function PATCH(req: NextRequest) {
 
     const body = await req.json()
     const adminSb = getAuthClient()
+
+    // unitId만 있으면 단원 이동, 나머지 필드가 있으면 전체 수정
+    const updatePayload: Record<string, any> = {}
+    if ('unitId' in body) updatePayload.unit_id = body.unitId ?? null
+    if ('title' in body) updatePayload.title = body.title
+    if ('topic' in body) updatePayload.topic = body.topic
+    if ('description' in body) updatePayload.description = body.description
+    if ('expectedOutput' in body) updatePayload.expected_output = body.expectedOutput
+    if ('level' in body) updatePayload.level = body.level
+    if ('hints' in body) updatePayload.hints = body.hints
+
     const { error } = await adminSb.from('custom_missions')
-      .update({ unit_id: body.unitId ?? null })
+      .update(updatePayload)
       .eq('id', id)
       .eq('teacher_id', user.id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

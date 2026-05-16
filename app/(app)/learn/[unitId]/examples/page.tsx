@@ -28,31 +28,50 @@ export default function ExamplesPage() {
   const [totalXP, setTotalXP] = useState(0)
   const [xpPopup, setXpPopup] = useState<{key: number} | null>(null)
   const popupKeyRef = useRef(0)
+  const userIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    getClient().auth.getUser()
+    async function init() {
+      const sb = getClient()
 
-    if (content) {
-      const initialCodes: Record<number, string> = {}
-      const initialInputs: Record<number, string[]> = {}
-      content.examples.forEach((ex, i) => {
-        initialCodes[i] = ex.code
-        initialInputs[i] = ex.defaultInputs ? [...ex.defaultInputs] : []
-      })
-      setCodes(initialCodes)
-      setInputValues(initialInputs)
-    }
+      // 유저 ID + 기존 XP 로드
+      const { data: { user } } = await sb.auth.getUser()
+      if (user) {
+        userIdRef.current = user.id
+        const { data: logs } = await sb.from('xp_logs')
+          .select('source_id, xp')
+          .eq('student_id', user.id)
+          .like('source_id', `ex-${unitId}-%`)
+        if (logs && logs.length > 0) {
+          const earned = new Set(logs.map((l: any) => parseInt(l.source_id.split('-')[2])))
+          setXpedSet(earned)
+          setTotalXP(logs.reduce((s: number, l: any) => s + (l.xp || 0), 0))
+        }
+      }
 
-    const s1 = document.createElement('script')
-    s1.src = 'https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js'
-    s1.onload = () => {
-      const s2 = document.createElement('script')
-      s2.src = 'https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js'
-      s2.onload = () => setPyReady(true)
-      document.head.appendChild(s2)
+      if (content) {
+        const initialCodes: Record<number, string> = {}
+        const initialInputs: Record<number, string[]> = {}
+        content.examples.forEach((ex, i) => {
+          initialCodes[i] = ex.code
+          initialInputs[i] = ex.defaultInputs ? [...ex.defaultInputs] : []
+        })
+        setCodes(initialCodes)
+        setInputValues(initialInputs)
+      }
+
+      const s1 = document.createElement('script')
+      s1.src = 'https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js'
+      s1.onload = () => {
+        const s2 = document.createElement('script')
+        s2.src = 'https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js'
+        s2.onload = () => setPyReady(true)
+        document.head.appendChild(s2)
+      }
+      document.head.appendChild(s1)
     }
-    document.head.appendChild(s1)
-  }, [content])
+    init()
+  }, [content, unitId])
 
   if (!unit || !content) return (
     <div className="flex items-center justify-center py-20 text-gray-400">단원을 찾을 수 없어요</div>
@@ -92,6 +111,16 @@ export default function ExamplesPage() {
         const key = popupKeyRef.current
         setXpPopup({ key })
         setTimeout(() => setXpPopup(p => p?.key === key ? null : p), 2000)
+
+        // Supabase에 XP 저장 (중복 방지)
+        if (userIdRef.current) {
+          const sb = getClient()
+          await sb.from('xp_logs').upsert({
+            student_id: userIdRef.current,
+            source_id: `ex-${unitId}-${index}`,
+            xp: XP_PER_EXAMPLE
+          }, { onConflict: 'student_id,source_id', ignoreDuplicates: true })
+        }
       }
     } catch (e: any) {
       const errMsg = String(e).replace(/^.*?Error:/, '오류:')
@@ -142,11 +171,11 @@ export default function ExamplesPage() {
             <span className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">💻 예제</span>
             <Link href={`/learn/${unitId}/guided`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✏️ 연습</Link>
             <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
+            <Link href={`/learn/${unitId}/custom-missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✨ 추가</Link>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 이번 세션 XP */}
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
             totalXP > 0 ? 'bg-teal-50 text-teal-700' : 'bg-gray-50 text-gray-300'
           }`}>
