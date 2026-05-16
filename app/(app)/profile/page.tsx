@@ -22,6 +22,10 @@ export default function ProfilePage() {
   const [geminiSaved, setGeminiSaved] = useState('')
   const [geminiLoading, setGeminiLoading] = useState(false)
   const [geminiMsg, setGeminiMsg] = useState('')
+  const [groqKey, setGroqKey] = useState('')
+  const [groqSaved, setGroqSaved] = useState('')
+  const [groqLoading, setGroqLoading] = useState(false)
+  const [groqMsg, setGroqMsg] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -32,6 +36,7 @@ export default function ProfilePage() {
       setProfile({ ...prof, email: user.email })
       setName(prof?.name || '')
       if (prof?.gemini_key) setGeminiSaved('●'.repeat(20) + prof.gemini_key.slice(-6))
+      if (prof?.groq_key) setGroqSaved('●'.repeat(20) + prof.groq_key.slice(-6))
       if (prof?.class_id) {
         const { data: cls } = await sb.from('classes').select('*').eq('id', prof.class_id).single()
         setCurrentClass(cls)
@@ -81,6 +86,23 @@ export default function ProfilePage() {
     const { error } = await sb.auth.updateUser({ password: pwNew })
     if (error) { setPwMsg(error.message); return }
     setPwMsg('✓ 비밀번호가 변경됐어요!'); setPwNew('')
+  }
+
+  async function saveGroqKey() {
+    if (!groqKey.trim()) return
+    setGroqLoading(true)
+    const sb = getClient()
+    const { data: { user } } = await sb.auth.getUser()
+    if (!user) return
+    const { error } = await sb.from('profiles').update({ groq_key: groqKey.trim() }).eq('id', user.id)
+    if (error) { setGroqMsg('저장 실패: ' + error.message) }
+    else {
+      setGroqSaved('●'.repeat(20) + groqKey.slice(-6))
+      setGroqKey('')
+      setGroqMsg('✓ 키가 저장됐어요! Gemini 키가 없을 때 자동으로 사용돼요.')
+      setTimeout(() => setGroqMsg(''), 4000)
+    }
+    setGroqLoading(false)
   }
 
   async function saveGeminiKey() {
@@ -172,24 +194,30 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* 교사: Gemini 키 */}
+      {/* 교사: AI API 키 */}
       {isTeacher && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-6">
-          <div className="flex items-center gap-3 mb-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-xl">🔑</div>
             <div>
-              <h2 className="font-semibold text-gray-900">Gemini API 키 <span className="text-xs text-gray-400 font-normal">AI 힌트 · 문제 생성에 사용</span></h2>
-              <p className="text-xs text-gray-400 mt-0.5">내 반 학생들의 AI 기능에 이 키가 사용돼요</p>
+              <h2 className="font-semibold text-gray-900">AI API 키 <span className="text-xs text-gray-400 font-normal">AI 힌트 · 문제 생성에 사용</span></h2>
+              <p className="text-xs text-gray-400 mt-0.5">내 반 학생들의 AI 기능에 사용돼요 · Gemini 우선, 없으면 Groq 사용</p>
             </div>
           </div>
-          {geminiSaved && (
-            <div className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-teal-50 border border-teal-200 rounded-xl">
-              <span className="text-teal-600">✓</span>
-              <span className="text-xs text-teal-700 font-mono">{geminiSaved}</span>
-              <span className="text-xs text-teal-500 ml-auto">등록됨</span>
-            </div>
-          )}
+
+          {/* Gemini */}
           <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium text-gray-700">Gemini</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">1순위</span>
+            </div>
+            {geminiSaved && (
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-teal-50 border border-teal-200 rounded-xl">
+                <span className="text-teal-600">✓</span>
+                <span className="text-xs text-teal-700 font-mono">{geminiSaved}</span>
+                <span className="text-xs text-teal-500 ml-auto">등록됨</span>
+              </div>
+            )}
             <div className="flex gap-2">
               <input type="password" value={geminiKey} onChange={e=>setGeminiKey(e.target.value)}
                 placeholder="AIzaSy... 새 키 입력"
@@ -202,7 +230,38 @@ export default function ProfilePage() {
             </div>
             {geminiMsg && <p className={`text-xs ${geminiMsg.startsWith('✓')?'text-teal-600':'text-red-500'}`}>{geminiMsg}</p>}
             <p className="text-xs text-gray-400">
-              👉 <a href="https://aistudio.google.com" target="_blank" rel="noopener" className="text-indigo-500 hover:underline">aistudio.google.com</a> → Google 로그인 → Get API key → 무료 발급
+              👉 <a href="https://aistudio.google.com" target="_blank" rel="noopener" className="text-indigo-500 hover:underline">aistudio.google.com</a> → Get API key → 무료 발급
+            </p>
+          </div>
+
+          <div className="border-t border-gray-100" />
+
+          {/* Groq */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium text-gray-700">Groq</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-600">2순위 (Gemini 없을 때)</span>
+            </div>
+            {groqSaved && (
+              <div className="flex items-center gap-3 px-4 py-2.5 bg-teal-50 border border-teal-200 rounded-xl">
+                <span className="text-teal-600">✓</span>
+                <span className="text-xs text-teal-700 font-mono">{groqSaved}</span>
+                <span className="text-xs text-teal-500 ml-auto">등록됨</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input type="password" value={groqKey} onChange={e=>setGroqKey(e.target.value)}
+                placeholder="gsk_... 새 키 입력"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono outline-none focus:border-orange-400"/>
+              <button onClick={saveGroqKey} disabled={groqLoading||!groqKey.trim()}
+                className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-50 transition-colors whitespace-nowrap"
+                style={{background:'#EA580C'}}>
+                {groqLoading?'저장 중...':'저장'}
+              </button>
+            </div>
+            {groqMsg && <p className={`text-xs ${groqMsg.startsWith('✓')?'text-teal-600':'text-red-500'}`}>{groqMsg}</p>}
+            <p className="text-xs text-gray-400">
+              👉 <a href="https://console.groq.com" target="_blank" rel="noopener" className="text-orange-500 hover:underline">console.groq.com</a> → 구글 로그인 → API Keys → 무료 발급 (14,400회/일)
             </p>
           </div>
         </div>

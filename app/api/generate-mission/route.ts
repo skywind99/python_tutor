@@ -3,22 +3,24 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import Groq from 'groq-sdk'
 import { createClient } from '@supabase/supabase-js'
 
-async function getTeacherGeminiKey(userId: string): Promise<string | null> {
+type TeacherKeys = { geminiKey: string | null; groqKey: string | null }
+
+async function getTeacherKeys(userId: string): Promise<TeacherKeys> {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!key) return null
+  if (!key) return { geminiKey: null, groqKey: null }
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
-  const { data } = await sb.from('profiles').select('gemini_key, class_id').eq('id', userId).single()
-  if (data?.gemini_key) return data.gemini_key
+  const { data } = await sb.from('profiles').select('gemini_key, groq_key, class_id').eq('id', userId).single()
+  if (data?.gemini_key || data?.groq_key) return { geminiKey: data.gemini_key, groqKey: data.groq_key }
   if (data?.class_id) {
     const { data: cls } = await sb.from('classes').select('teacher_id').eq('id', data.class_id).single()
     if (cls?.teacher_id) {
-      const { data: teacher } = await sb.from('profiles').select('gemini_key').eq('id', cls.teacher_id).single()
-      if (teacher?.gemini_key) return teacher.gemini_key
+      const { data: teacher } = await sb.from('profiles').select('gemini_key, groq_key').eq('id', cls.teacher_id).single()
+      if (teacher) return { geminiKey: teacher.gemini_key, groqKey: teacher.groq_key }
     }
   }
-  return null
+  return { geminiKey: null, groqKey: null }
 }
 
 const MISSION_PROMPT = (concept: string, difficulty: string, context: string | undefined) =>
@@ -49,9 +51,9 @@ export async function POST(req: NextRequest) {
     const { concept, difficulty, context, unitId, userId } = await req.json()
     const prompt = MISSION_PROMPT(concept, difficulty, context)
 
-    // 교사 Gemini 키 우선 사용
+    // 교사 키 조회 (Gemini 우선, 없으면 Groq)
     if (userId) {
-      const geminiKey = await getTeacherGeminiKey(userId)
+      const { geminiKey, groqKey } = await getTeacherKeys(userId)
       if (geminiKey) {
         const genAI = new GoogleGenerativeAI(geminiKey)
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
@@ -60,34 +62,20 @@ export async function POST(req: NextRequest) {
         mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
         return NextResponse.json({ mission, provider: 'gemini' })
       }
+      if (groqKey) {
+        const groq = new Groq({ apiKey: groqKey })
+        const completion = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 800,
+        })
+        const mission = parseJson(completion.choices[0].message.content || '')
+        mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
+        return NextResponse.json({ mission, provider: 'groq' })
+      }
     }
 
-    // Groq 기본값
-    const groqKey = process.env.GROQ_API_KEY
-    if (groqKey) {
-      const groq = new Groq({ apiKey: groqKey })
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 800,
-      })
-      const mission = parseJson(completion.choices[0].message.content || '')
-      mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
-      return NextResponse.json({ mission, provider: 'groq' })
-    }
-
-    // 환경변수 Gemini 키 마지막 fallback
-    const geminiEnvKey = process.env.GEMINI_API_KEY
-    if (geminiEnvKey) {
-      const genAI = new GoogleGenerativeAI(geminiEnvKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-      const result = await model.generateContent(prompt)
-      const mission = parseJson(result.response.text())
-      mission.id = Date.now(); mission.unitId = unitId || 6; mission.level = Number(difficulty)
-      return NextResponse.json({ mission, provider: 'gemini' })
-    }
-
-    return NextResponse.json({ error: 'API 키가 없어요. 내 정보 페이지에서 키를 먼저 등록해주세요.' }, { status: 503 })
+    return NextResponse.json({ error: 'AI 키가 없어요. 내 정보 페이지에서 Gemini 또는 Groq 키를 등록해주세요.' }, { status: 503 })
   } catch (err: any) {
     console.error('generate-mission error:', err)
     if (err?.status === 429) return NextResponse.json({ error: 'AI 일일 한도 초과. 내일 다시 시도하거나 API 키를 확인해주세요.' }, { status: 429 })

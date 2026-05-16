@@ -3,22 +3,24 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import Groq from 'groq-sdk'
 import { createClient } from '@supabase/supabase-js'
 
-async function getTeacherGeminiKey(userId: string): Promise<string | null> {
+type TeacherKeys = { geminiKey: string | null; groqKey: string | null }
+
+async function getTeacherKeys(userId: string): Promise<TeacherKeys> {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!key) return null
+  if (!key) return { geminiKey: null, groqKey: null }
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
-  const { data } = await sb.from('profiles').select('gemini_key, class_id').eq('id', userId).single()
-  if (data?.gemini_key) return data.gemini_key
+  const { data } = await sb.from('profiles').select('gemini_key, groq_key, class_id').eq('id', userId).single()
+  if (data?.gemini_key || data?.groq_key) return { geminiKey: data.gemini_key, groqKey: data.groq_key }
   if (data?.class_id) {
     const { data: cls } = await sb.from('classes').select('teacher_id').eq('id', data.class_id).single()
     if (cls?.teacher_id) {
-      const { data: teacher } = await sb.from('profiles').select('gemini_key').eq('id', cls.teacher_id).single()
-      if (teacher?.gemini_key) return teacher.gemini_key
+      const { data: teacher } = await sb.from('profiles').select('gemini_key, groq_key').eq('id', cls.teacher_id).single()
+      if (teacher) return { geminiKey: teacher.gemini_key, groqKey: teacher.groq_key }
     }
   }
-  return null
+  return { geminiKey: null, groqKey: null }
 }
 
 export async function POST(req: NextRequest) {
@@ -51,37 +53,24 @@ ${codeCtx}${errorCtx}${prevCtx}
 
 마지막에 응원으로 끝내. 답변을 매번 다양하게 해줘.`
 
-    // 교사 Gemini 키 우선 사용
+    // 교사 키 조회 (Gemini 우선, 없으면 Groq)
     if (userId) {
-      const geminiKey = await getTeacherGeminiKey(userId)
+      const { geminiKey, groqKey } = await getTeacherKeys(userId)
       if (geminiKey) {
         const genAI = new GoogleGenerativeAI(geminiKey)
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
         const result = await model.generateContent(prompt)
         return NextResponse.json({ hint: result.response.text(), provider: 'gemini' })
       }
-    }
-
-    // Groq 기본값
-    const groqKey = process.env.GROQ_API_KEY
-    if (groqKey) {
-      const groq = new Groq({ apiKey: groqKey })
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 300,
-      })
-      const hint = completion.choices[0].message.content || ''
-      return NextResponse.json({ hint, provider: 'groq' })
-    }
-
-    // 환경변수 Gemini 키 마지막 fallback
-    const geminiEnvKey = process.env.GEMINI_API_KEY
-    if (geminiEnvKey) {
-      const genAI = new GoogleGenerativeAI(geminiEnvKey)
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-      const result = await model.generateContent(prompt)
-      return NextResponse.json({ hint: result.response.text(), provider: 'gemini' })
+      if (groqKey) {
+        const groq = new Groq({ apiKey: groqKey })
+        const completion = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 300,
+        })
+        return NextResponse.json({ hint: completion.choices[0].message.content || '', provider: 'groq' })
+      }
     }
 
     return NextResponse.json({ error: '담당 선생님이 API 키를 아직 등록하지 않으셨어요.', needsKey: true }, { status: 503 })
