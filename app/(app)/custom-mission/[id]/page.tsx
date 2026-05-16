@@ -97,6 +97,17 @@ export default function CustomMissionPage() {
         setPassed(true)
         setShowSuccessLottie(true)
         setTimeout(() => setShowSuccessLottie(false), 3500)
+        if (userId) {
+          const sb = getClient()
+          sb.from('custom_mission_logs').upsert({
+            custom_mission_id: id,
+            student_id: userId,
+            passed: true,
+            code,
+            score: Math.max(10, 100 - hintCount * 15),
+            hints_used: hintCount,
+          }, { onConflict: 'custom_mission_id,student_id' })
+        }
       }
     } catch (e: any) {
       setOutput(String(e).replace(/^.*?Error:/, '오류:'))

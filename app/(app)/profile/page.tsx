@@ -149,7 +149,7 @@ export default function ProfilePage() {
   const themeBg = isTeacher ? '#EEF2FF' : '#EFF6FF'
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-5">
+    <div className="max-w-6xl mx-auto p-6 space-y-5">
       <h1 className="text-xl font-bold text-gray-900">👤 내 정보</h1>
 
       <div className="bg-white rounded-2xl border border-gray-100 p-6">

@@ -114,7 +114,7 @@ function StudentsContent() {
   if (loading) return <div className="p-8 text-center text-gray-400">불러오는 중...</div>
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6">
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-bold text-gray-900">👥 학생 관리</h1>
         <div className="flex rounded-xl overflow-hidden border border-gray-200 text-sm">

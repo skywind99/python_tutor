@@ -107,7 +107,7 @@ export default function RankingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold text-gray-900">🏆 랭킹</h1>
           <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-white text-sm">

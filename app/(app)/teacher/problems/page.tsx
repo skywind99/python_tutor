@@ -22,6 +22,7 @@ export default function ProblemsPage() {
   const [userId, setUserId] = useState('')
   const [tab, setTab] = useState<'solutions'|'ai'>('solutions')
   const [customMissions, setCustomMissions] = useState<any[]>([])
+  const [customLogs, setCustomLogs] = useState<any[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [movingId, setMovingId] = useState<string | null>(null)
   const [editingMission, setEditingMission] = useState<any | null>(null)
@@ -44,16 +45,21 @@ export default function ProblemsPage() {
       const { data: prof } = await sb.from('profiles').select('role, gemini_key').eq('id', user.id).single()
       if (prof?.role !== 'teacher') { router.push('/dashboard'); return }
 
-      const { data: cls } = await sb.from('classes').select('id').eq('teacher_id', user.id).single()
-      if (!cls) { setLoading(false); return }
+      const { data: classes } = await sb.from('classes').select('id').eq('teacher_id', user.id)
+      if (!classes?.length) { setLoading(false); return }
+      const classIds = classes.map((c: any) => c.id)
 
-      const { data: studs } = await sb.from('profiles').select('id, name').eq('class_id', cls.id).eq('role', 'student')
+      const { data: studs } = await sb.from('profiles').select('id, name').in('class_id', classIds).eq('role', 'student')
       setStudents(studs || [])
 
       if (studs?.length) {
         const ids = studs.map((s: any) => s.id)
-        const { data: allLogs } = await sb.from('mission_logs').select('*').in('student_id', ids)
+        const [{ data: allLogs }, { data: cLogs }] = await Promise.all([
+          sb.from('mission_logs').select('*').in('student_id', ids),
+          sb.from('custom_mission_logs').select('*').in('student_id', ids),
+        ])
         setLogs(allLogs || [])
+        setCustomLogs(cLogs || [])
       }
       setLoading(false)
     }
@@ -159,6 +165,12 @@ export default function ProblemsPage() {
       .filter(l => l.mission_id === missionId)
       .map(l => ({ ...l, studentName: students.find(s => s.id === l.student_id)?.name || '알 수 없음' }))
       .sort((a, b) => b.score - a.score)
+  }
+
+  function getCustomMissionSolvers(customMissionId: string) {
+    return customLogs
+      .filter(l => l.custom_mission_id === customMissionId && l.passed)
+      .map(l => ({ ...l, studentName: students.find(s => s.id === l.student_id)?.name || '알 수 없음' }))
   }
 
   if (loading) return (
@@ -334,7 +346,9 @@ export default function ProblemsPage() {
           {unitCustomMissions.length > 0 && (
             <div className="pt-2">
               <div className="text-xs font-semibold text-gray-400 mb-2 px-1">✨ 선생님 추가 문제</div>
-              {unitCustomMissions.map((m: any) => (
+              {unitCustomMissions.map((m: any) => {
+                const solvers = getCustomMissionSolvers(m.id)
+                return (
                 <div key={m.id} className="bg-white rounded-2xl border border-indigo-100 p-3 mb-2">
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
@@ -345,6 +359,15 @@ export default function ProblemsPage() {
                       <div className="text-sm font-semibold text-gray-900 mt-1 truncate">{m.title}</div>
                       <div className="text-xs text-gray-400">{m.topic}</div>
                     </div>
+                  </div>
+                  <div className="mt-2 mb-2">
+                    {solvers.length > 0 ? (
+                      <div className="text-xs text-teal-600 font-medium">
+                        ✓ {solvers.length}명 완료: {solvers.map(s => s.studentName).join(', ')}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-300">아직 완료한 학생 없음</div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 mt-2">
                     <select
@@ -371,7 +394,8 @@ export default function ProblemsPage() {
                     </button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

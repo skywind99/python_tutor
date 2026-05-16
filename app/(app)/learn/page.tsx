@@ -16,7 +16,7 @@ export default function LearnPage() {
   }, {} as Record<number, number>)
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6">
       <div className="mb-5">
         <h1 className="text-lg font-bold text-gray-900">단원별 학습</h1>
       </div>

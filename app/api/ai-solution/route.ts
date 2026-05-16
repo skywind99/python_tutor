@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: 'API 키를 먼저 등록해주세요.' }, { status: 503 })
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
 
     const prompt = `다음 파이썬 문제의 모범 풀이 코드를 작성해줘. 코드만 작성하고, 각 줄에 간단한 한국어 주석을 달아줘.
 

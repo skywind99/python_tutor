@@ -13,7 +13,7 @@ function getClient() {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState<'student'|'teacher'>('student')
@@ -26,16 +26,22 @@ function LoginForm() {
     if (searchParams.get('mode') === 'signup') setMode('signup')
   }, [searchParams])
 
+  function toEmail(id: string) { return `${id.trim().toLowerCase()}@pytutor.local` }
+
   async function handleSubmit() {
     setError(''); setLoading(true)
     const sb = getClient()
     try {
+      if (!username.trim()) throw new Error('아이디를 입력해주세요.')
+      if (!/^[a-z0-9_.]+$/i.test(username.trim())) throw new Error('아이디는 영문·숫자·_·.만 사용할 수 있어요.')
+      const email = toEmail(username)
       if (mode === 'login') {
         const { error } = await sb.auth.signInWithPassword({ email, password })
-        if (error) throw error
+        if (error) throw new Error('아이디 또는 비밀번호가 올바르지 않아요.')
         router.push('/dashboard')
       } else {
         if (!name.trim()) throw new Error('이름을 입력해주세요.')
+        if (password.length < 6) throw new Error('비밀번호는 6자 이상이어야 해요.')
         const { data, error } = await sb.auth.signUp({
           email, password,
           options: { data: { name, role } }
@@ -111,9 +117,10 @@ function LoginForm() {
 
           {/* 공통 필드 */}
           <div>
-            <label className="text-xs font-medium text-gray-500 mb-1.5 block">이메일</label>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-              placeholder="example@school.kr"
+            <label className="text-xs font-medium text-gray-500 mb-1.5 block">아이디</label>
+            <input type="text" value={username} onChange={e=>setUsername(e.target.value)}
+              placeholder="영문·숫자·_·. 사용 가능"
+              autoComplete="username"
               className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-gray-400 transition-colors"/>
           </div>
           <div>
