@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       if (groqKey) {
         const groq = new Groq({ apiKey: groqKey })
         const completion = await groq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
+          model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 800,
         })
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'AI 키가 없어요. 내 정보 페이지에서 Gemini 또는 Groq 키를 등록해주세요.' }, { status: 503 })
   } catch (err: any) {
     console.error('generate-mission error:', err)
-    if (err?.status === 429) return NextResponse.json({ error: 'AI 일일 한도 초과. 내일 다시 시도하거나 API 키를 확인해주세요.' }, { status: 429 })
+    if (err?.status === 429) return NextResponse.json({ error: 'AI 요청 한도 초과. 잠시 후 다시 시도해주세요.' }, { status: 429 })
     return NextResponse.json({ error: err?.message || '오류가 발생했어요. 다시 시도해주세요.' }, { status: 500 })
   }
 }

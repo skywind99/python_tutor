@@ -65,7 +65,7 @@ ${codeCtx}${errorCtx}${prevCtx}
       if (groqKey) {
         const groq = new Groq({ apiKey: groqKey })
         const completion = await groq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
+          model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 300,
         })
@@ -75,7 +75,7 @@ ${codeCtx}${errorCtx}${prevCtx}
 
     return NextResponse.json({ error: '담당 선생님이 API 키를 아직 등록하지 않으셨어요.', needsKey: true }, { status: 503 })
   } catch (err: any) {
-    if (err?.status === 429) return NextResponse.json({ error: 'AI 힌트 일일 한도 초과. 내일 다시 시도해주세요.' }, { status: 429 })
+    if (err?.status === 429) return NextResponse.json({ error: 'AI 요청 한도 초과. 잠시 후 다시 시도해주세요.' }, { status: 429 })
     return NextResponse.json({ error: '힌트를 불러오지 못했어요.' }, { status: 500 })
   }
 }
