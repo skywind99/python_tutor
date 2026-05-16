@@ -17,14 +17,20 @@ export async function POST(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
     const { groqKey } = await getTeacherKeys(userId)
+    if (!groqKey) return NextResponse.json({ error: 'Groq 키가 등록되지 않았어요.' }, { status: 404 })
 
-    if (!groqKey) {
-      return NextResponse.json({ error: 'Groq 키가 등록되지 않았어요.' }, { status: 404 })
-    }
-
-    // Groq /v1/models 호출 — 가벼운 GET 요청으로 rate limit 헤더 읽기
-    const res = await fetch('https://api.groq.com/openai/v1/models', {
-      headers: { Authorization: `Bearer ${groqKey}` },
+    // 최소 completion 요청으로 rate limit 헤더 읽기
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${groqKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: '.' }],
+        max_tokens: 1,
+      }),
     })
 
     if (!res.ok) {
@@ -32,19 +38,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: err?.error?.message || 'Groq 키를 확인할 수 없어요.' }, { status: res.status })
     }
 
-    const remainingRequests = res.headers.get('x-ratelimit-remaining-requests')
-    const limitRequests = res.headers.get('x-ratelimit-limit-requests')
-    const remainingTokens = res.headers.get('x-ratelimit-remaining-tokens')
-    const limitTokens = res.headers.get('x-ratelimit-limit-tokens')
-    const resetRequests = res.headers.get('x-ratelimit-reset-requests')
-
     return NextResponse.json({
       groq: {
-        remainingRequests: remainingRequests ? Number(remainingRequests) : null,
-        limitRequests: limitRequests ? Number(limitRequests) : null,
-        remainingTokens: remainingTokens ? Number(remainingTokens) : null,
-        limitTokens: limitTokens ? Number(limitTokens) : null,
-        resetRequests,
+        remainingRequests: Number(res.headers.get('x-ratelimit-remaining-requests') ?? -1),
+        limitRequests: Number(res.headers.get('x-ratelimit-limit-requests') ?? -1),
+        remainingTokens: Number(res.headers.get('x-ratelimit-remaining-tokens') ?? -1),
+        limitTokens: Number(res.headers.get('x-ratelimit-limit-tokens') ?? -1),
+        resetRequests: res.headers.get('x-ratelimit-reset-requests'),
       }
     })
   } catch (err: any) {

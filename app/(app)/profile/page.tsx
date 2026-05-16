@@ -288,18 +288,25 @@ export default function ProfilePage() {
           {/* 잔여량 확인 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">📊 API 잔여량 확인</span>
+              <span className="text-sm font-medium text-gray-700">📊 API 잔여량</span>
               <div className="flex items-center gap-2">
-                <a href="https://aistudio.google.com/plan_information" target="_blank" rel="noopener"
+                <a href="https://aistudio.google.com/" target="_blank" rel="noopener"
                   className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
-                  Gemini 확인 →
+                  Gemini →
+                </a>
+                <a href="https://console.groq.com/usage" target="_blank" rel="noopener"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors">
+                  Groq →
                 </a>
                 <button onClick={checkQuota} disabled={quotaLoading || !groqSaved}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 disabled:opacity-40 transition-colors">
-                  {quotaLoading ? '확인 중...' : 'Groq 확인'}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+                  {quotaLoading ? '확인 중...' : '🔄 실시간'}
                 </button>
               </div>
             </div>
+            {!groqSaved && (
+              <p className="text-xs text-gray-400">Groq 키를 등록하면 실시간 잔여량을 확인할 수 있어요.</p>
+            )}
             {quota?.error && (
               <p className="text-xs text-red-500">{quota.error}</p>
             )}
@@ -307,16 +314,14 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-2">
                 {[
                   {
-                    label: '요청 잔여',
-                    value: quota.groq.remainingRequests ?? '-',
-                    total: quota.groq.limitRequests,
-                    color: 'orange',
+                    label: 'Groq 요청 잔여',
+                    value: quota.groq.remainingRequests >= 0 ? quota.groq.remainingRequests.toLocaleString() : '-',
+                    total: quota.groq.limitRequests >= 0 ? quota.groq.limitRequests : null,
                   },
                   {
-                    label: '토큰 잔여',
-                    value: quota.groq.remainingTokens != null ? quota.groq.remainingTokens.toLocaleString() : '-',
-                    total: quota.groq.limitTokens,
-                    color: 'orange',
+                    label: 'Groq 토큰 잔여',
+                    value: quota.groq.remainingTokens >= 0 ? quota.groq.remainingTokens.toLocaleString() : '-',
+                    total: quota.groq.limitTokens >= 0 ? quota.groq.limitTokens : null,
                   },
                 ].map(item => (
                   <div key={item.label} className="bg-orange-50 rounded-xl p-3">
@@ -328,9 +333,6 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
-            )}
-            {!groqSaved && (
-              <p className="text-xs text-gray-400">Groq 키를 등록하면 잔여량을 확인할 수 있어요.</p>
             )}
           </div>
         </div>
