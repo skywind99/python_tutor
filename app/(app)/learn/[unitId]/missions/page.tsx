@@ -239,7 +239,7 @@ export default function MissionsPage() {
   const ringArc = Math.round((xp/1000)*94)
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex bg-gray-50 overflow-hidden" style={{height:'calc(100vh - 3.5rem)'}}>
       {/* Sidebar */}
       <div className="w-52 bg-white border-r border-gray-100 flex flex-col overflow-y-auto flex-shrink-0">
         <div className="p-4 border-b border-gray-50">

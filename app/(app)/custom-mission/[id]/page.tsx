@@ -132,7 +132,7 @@ export default function CustomMissionPage() {
   const levelLabel = ['', '기초', '응용', '심화'][mission.level] || '응용'
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex bg-gray-50 overflow-hidden" style={{height:'calc(100vh - 3.5rem)'}}>
       {/* Sidebar */}
       <div className="w-52 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 p-4 space-y-3">
         <Link href="/dashboard" className="text-xs text-gray-400 hover:text-gray-600">← 대시보드</Link>
