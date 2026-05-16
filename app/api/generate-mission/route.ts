@@ -39,11 +39,15 @@ const MISSION_PROMPT = (concept: string, difficulty: string, context: string | u
 
 ## 필수 규칙
 1. expectedOutput은 파이썬으로 실제 실행했을 때 나오는 정확한 출력이어야 함 (공백/줄바꿈 포함)
-2. template는 학생이 채울 빈 코드 (# TODO 주석으로 작성 위치 표시)
-3. description은 줄바꿈을 \\n으로, 예시 입출력 반드시 포함
+2. template는 학생이 채울 빈 코드. 리스트/변수는 이미 선언해서 넣어줌. # TODO 주석으로 작성 위치 표시
+3. description 작성 규칙:
+   - needsInput이 false인 경우: "입력:" 표현 절대 쓰지 마. 대신 "주어진 코드:", "아래 리스트를 활용해" 식으로 작성
+   - needsInput이 true인 경우에만 "입력 예시:" 사용 가능
+   - 줄바꿈은 \\n으로
 4. hints[0]은 방향만, hints[1]은 문법 언급, hints[2]는 코드 구조 일부
-5. needsInput이 true면 defaultInput에 테스트용 입력값 작성
+5. needsInput이 true면 defaultInput에 테스트용 입력값 작성 (단순값, 리스트 아님)
 6. 절대 한국어 변수명 사용 금지
+7. 리스트/딕셔너리 문제는 반드시 needsInput: false로, 데이터를 template에 하드코딩
 
 ## 출력 형식 (JSON만, 다른 말 없이)
 {
