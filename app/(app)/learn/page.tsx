@@ -1,13 +1,29 @@
 'use client'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 import { UNITS, MISSIONS, LEVEL_INFO } from '@/data/missions'
+import { TUTORIAL_MISSIONS } from '@/data/tutorial'
+
+const TUTORIAL_TOTAL_PAGES = TUTORIAL_MISSIONS.reduce((s, m) => s + m.pages.length, 0)
 
 export default function LearnPage() {
   const [customMissions, setCustomMissions] = useState<any[]>([])
+  const [tutorialDone, setTutorialDone] = useState(0)
 
   useEffect(() => {
     fetch('/api/custom-missions').then(r => r.json()).then(d => setCustomMissions(d.missions || []))
+
+    // 튜토리얼 진행도 로드
+    async function loadTutorial() {
+      const sb = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) return
+      const { count } = await sb.from('xp_logs').select('*', { count: 'exact', head: true })
+        .eq('student_id', user.id).like('source_id', 'tutorial-%')
+      setTutorialDone(count || 0)
+    }
+    loadTutorial()
   }, [])
 
   const customByUnit = customMissions.reduce((acc, m) => {
@@ -23,6 +39,35 @@ export default function LearnPage() {
           <p className="text-sm text-gray-400 mt-0.5">개념 · 예제 · 연습 · 미션 순서로 학습해요</p>
         </div>
       </div>
+
+      {/* 튜토리얼 카드 */}
+      <Link href="/tutorial" className="block mb-4">
+        <div className="rounded-2xl p-4 flex items-center gap-4 hover:opacity-90 transition-opacity"
+          style={{ background: 'linear-gradient(135deg, #302B63 0%, #24243E 100%)', border: '1px solid rgba(139,92,246,0.3)' }}>
+          <div className="text-3xl w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)' }}>
+            🎙️
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-white text-sm">슬기로운 방송부 생활 · 튜토리얼</div>
+            <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              파이썬 기초 개념을 스토리로 배워요 · 단원 학습 전에 먼저!
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.1)', maxWidth: 120 }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min((tutorialDone / TUTORIAL_TOTAL_PAGES) * 100, 100)}%`, background: '#a78bfa' }} />
+              </div>
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                {tutorialDone}/{TUTORIAL_TOTAL_PAGES} 완료
+              </span>
+              {tutorialDone >= TUTORIAL_TOTAL_PAGES && (
+                <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>✓ 클리어!</span>
+              )}
+            </div>
+          </div>
+          <div className="text-white/30 text-lg">→</div>
+        </div>
+      </Link>
 
       <div className="flex flex-col gap-3">
         {UNITS.map((unit, idx) => {

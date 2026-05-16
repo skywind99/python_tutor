@@ -1,7 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { createBrowserClient } from '@supabase/ssr'
 import { TUTORIAL_MISSIONS, type Mission, type TutorialPage } from '@/data/tutorial'
+
+function getClient() {
+  return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+}
 
 // ── 타입 ──────────────────────────────────
 type Screen = 'map' | 'prologue' | 'mission'
@@ -189,9 +194,34 @@ export default function TutorialPage() {
   const [completedPages, setCompletedPages] = useState<Set<string>>(new Set())
   const [totalXP, setTotalXP] = useState(0)
   const [showComplete, setShowComplete] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const savingRef = useRef(false)
 
   const totalPages = TUTORIAL_MISSIONS.reduce((s, m) => s + m.pages.length, 0)
   const completedCount = completedPages.size
+
+  // 로그인된 경우 기존 진행도 로드
+  useEffect(() => {
+    async function loadProgress() {
+      const sb = getClient()
+      const { data: { user } } = await sb.auth.getUser()
+      if (!user) return
+      setUserId(user.id)
+
+      const { data: logs } = await sb.from('xp_logs')
+        .select('source_id, xp')
+        .eq('student_id', user.id)
+        .like('source_id', 'tutorial-%')
+
+      if (logs && logs.length > 0) {
+        // source_id 형식: tutorial-{missionId}-{pageId}
+        const keys = new Set(logs.map(l => l.source_id.slice('tutorial-'.length)))
+        setCompletedPages(keys)
+        setTotalXP(logs.reduce((s, l) => s + (l.xp || 0), 0))
+      }
+    }
+    loadProgress()
+  }, [])
 
   function startMission(mission: Mission) {
     setCurrentMission(mission)
@@ -199,13 +229,29 @@ export default function TutorialPage() {
     setScreen('prologue')
   }
 
-  function onPassPage() {
+  async function onPassPage() {
     if (!currentMission) return
     const page = currentMission.pages[pageIdx]
     const key = `${currentMission.id}-${page.id}`
+
     if (!completedPages.has(key)) {
       setCompletedPages(prev => new Set([...prev, key]))
       setTotalXP(prev => prev + page.xp)
+
+      // 로그인된 경우 DB에 저장
+      if (userId && !savingRef.current) {
+        savingRef.current = true
+        try {
+          const sb = getClient()
+          await sb.from('xp_logs').upsert({
+            student_id: userId,
+            source_id: `tutorial-${key}`,
+            xp: page.xp,
+          }, { onConflict: 'student_id,source_id', ignoreDuplicates: true })
+        } finally {
+          savingRef.current = false
+        }
+      }
     }
 
     if (pageIdx < currentMission.pages.length - 1) {
@@ -229,7 +275,9 @@ export default function TutorialPage() {
       <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0F0C29 0%, #302B63 50%, #24243E 100%)' }}>
         {/* Header */}
         <div className="px-6 py-5 flex items-center justify-between">
-          <Link href="/" className="text-white/50 hover:text-white text-sm transition-colors">← 홈으로</Link>
+          <Link href={userId ? "/learn" : "/"} className="text-white/50 hover:text-white text-sm transition-colors">
+            {userId ? "← 학습으로" : "← 홈으로"}
+          </Link>
           <div className="flex items-center gap-3">
             <div className="text-xs text-white/50">{completedCount}/{totalPages} 완료</div>
             <div className="bg-yellow-500/20 text-yellow-300 text-xs font-bold px-3 py-1 rounded-full border border-yellow-500/30">
@@ -310,9 +358,12 @@ export default function TutorialPage() {
               <div className="text-4xl mb-3">🏆</div>
               <h2 className="text-xl font-black text-yellow-300 mb-1">전체 클리어!</h2>
               <p className="text-white/60 text-sm mb-4">당신은 진정한 마스터 PD입니다!</p>
-              <Link href="/learn"
+              {!userId && (
+                <p className="text-yellow-300/70 text-xs mb-3">💡 로그인하면 XP가 계정에 저장돼요!</p>
+              )}
+              <Link href={userId ? "/learn" : "/login"}
                 className="inline-block px-6 py-3 bg-yellow-400 text-gray-900 font-bold rounded-xl hover:bg-yellow-300 transition-colors text-sm">
-                이제 미션 풀러 가기 🎯
+                {userId ? "이제 미션 풀러 가기 🎯" : "로그인하고 이어하기 →"}
               </Link>
             </div>
           )}
