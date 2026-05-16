@@ -279,12 +279,12 @@ export default function MissionsPage() {
     <div className="flex overflow-hidden" style={{height:'calc(100vh - 3.5rem)',background:'#0d1117'}}>
 
       {/* ── 사이드바: 미션 목록 ── */}
-      <div className="w-52 flex flex-col overflow-y-auto flex-shrink-0" style={{background:'#161b22',borderRight:'1px solid #30363d'}}>
+      <div className="w-60 flex flex-col overflow-y-auto flex-shrink-0" style={{background:'#161b22',borderRight:'1px solid #30363d'}}>
         <div className="p-4" style={{borderBottom:'1px solid #30363d'}}>
           <Link href="/learn" className="text-xs hover:opacity-80 mb-2 block transition-opacity" style={{color:'#8b949e'}}>← 단원 목록</Link>
           <div className="text-xs font-semibold mb-0.5" style={{color:'#8b949e'}}>단원 {unitId}</div>
           <div className="font-semibold text-sm text-white">{unit?.title}</div>
-          <div className="flex gap-1 mt-2 flex-wrap">
+          <div className="flex gap-1 mt-2">
             <Link href={`/learn/${unitId}/concept`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>📖</Link>
             <Link href={`/learn/${unitId}/examples`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>💻</Link>
             <Link href={`/learn/${unitId}/guided`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>✏️</Link>
