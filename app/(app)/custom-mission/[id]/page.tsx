@@ -152,7 +152,7 @@ export default function CustomMissionPage() {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Problem */}
-        <div className="bg-white border-b border-gray-100 p-4 overflow-y-auto" style={{ height: '200px' }}>
+        <div className="bg-white border-b border-gray-100 p-4 overflow-y-auto flex-[2] min-h-0">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-sm font-semibold text-gray-900">{mission.title}</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">{levelLabel}</span>
@@ -162,7 +162,7 @@ export default function CustomMissionPage() {
         </div>
 
         {/* Output/Hint tabs */}
-        <div className="bg-white border-b border-gray-100 flex flex-col" style={{ height: '180px' }}>
+        <div className="bg-white border-b border-gray-100 flex flex-col flex-[2] min-h-0">
           <div className="flex border-b border-gray-100 flex-shrink-0">
             {(['output', 'hint'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
@@ -217,7 +217,7 @@ export default function CustomMissionPage() {
         </div>
 
         {/* Code editor */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-[3] flex flex-col min-h-0">
           <textarea value={code} onChange={e => setCode(e.target.value)}
             className="flex-1 p-4 font-mono text-sm text-gray-800 bg-gray-50 border-none outline-none resize-none" spellCheck={false} />
           <div className="bg-white border-t border-gray-100 px-4 py-2.5 flex gap-2 items-center">

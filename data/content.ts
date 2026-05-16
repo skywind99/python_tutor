@@ -51,25 +51,20 @@ print(type(x))  # <class 'int'>
 print(type(s))  # <class 'str'>`
         },
         {
-          title: "산술 연산자",
-          body: "파이썬에서 사용하는 수학 연산자들이에요.",
-          code: `a = 10
-b = 3
+          title: "여러 값 출력하기",
+          body: "print()에 쉼표로 여러 값을 넣거나, + 로 문자열을 이어 붙일 수 있어요.",
+          code: `name = "홍길동"
+age = 17
 
-print(a + b)   # 13  (덧셈)
-print(a - b)   # 7   (뺄셈)
-print(a * b)   # 30  (곱셈)
-print(a / b)   # 3.333... (나눗셈)
-print(a // b)  # 3   (몫)
-print(a % b)   # 1   (나머지)
-print(a ** b)  # 1000 (거듭제곱)`
+print("이름:", name, "나이:", age)   # 쉼표 방식
+print("이름: " + name)              # 문자열 연결`
         }
       ],
       keyPoints: [
         "print()로 화면에 출력할 수 있어요",
         "변수 이름은 영문자나 _로 시작해야 해요",
         "= 는 오른쪽 값을 왼쪽 변수에 저장해요",
-        "// 는 나눗셈의 몫, % 는 나머지예요"
+        "문자열은 따옴표(' ' 또는 \" \")로 감싸요"
       ]
     },
     examples: [
@@ -87,23 +82,194 @@ print("학교:", school)`,
         explanation: "변수에 문자열과 숫자를 저장한 뒤 print()로 출력해요. 쉼표로 여러 값을 한 번에 출력할 수 있어요."
       },
       {
-        title: "용돈 계산기",
-        description: "변수와 연산자로 계산을 해봐요",
-        code: `pocket_money = 50000
-snack = 3500
-lunch = 8000
-total_spent = snack + lunch
+        title: "다양한 출력 방법",
+        description: "print()의 여러 활용법을 익혀봐요",
+        code: `subject = "파이썬"
+score = 100
 
-print("용돈:", pocket_money, "원")
-print("쓴 돈:", total_spent, "원")
-print("남은 돈:", pocket_money - total_spent, "원")`,
-        output: "용돈: 50000 원\n쓴 돈: 11500 원\n남은 돈: 38500 원",
-        explanation: "변수로 금액을 저장하고 + 연산으로 합계를 구했어요."
+print("과목:", subject)
+print("점수:", score)
+print(subject + " 점수는 " + str(score) + "점!")`,
+        output: "과목: 파이썬\n점수: 100\n파이썬 점수는 100점!",
+        explanation: "숫자를 문자열과 + 로 합칠 때는 str()로 변환해야 해요."
       }
     ]
   },
   {
     unitId: 2,
+    concept: {
+      summary: "덧셈·뺄셈 같은 산술 연산부터 크기 비교, 참/거짓을 다루는 논리 연산까지 배워요.",
+      sections: [
+        {
+          title: "산술 연산자",
+          body: "숫자 계산에 사용하는 연산자들이에요.",
+          code: `a = 10
+b = 3
+
+print(a + b)   # 13  (덧셈)
+print(a - b)   # 7   (뺄셈)
+print(a * b)   # 30  (곱셈)
+print(a / b)   # 3.333... (나눗셈)
+print(a // b)  # 3   (몫)
+print(a % b)   # 1   (나머지)
+print(a ** b)  # 1000 (거듭제곱)`
+        },
+        {
+          title: "비교 연산자",
+          body: "두 값을 비교해서 True 또는 False를 반환해요.",
+          code: `print(5 > 3)    # True  (크다)
+print(5 < 3)    # False (작다)
+print(5 >= 5)   # True  (크거나 같다)
+print(5 <= 4)   # False (작거나 같다)
+print(5 == 5)   # True  (같다)
+print(5 != 3)   # True  (다르다)`
+        },
+        {
+          title: "논리 연산자",
+          body: "여러 조건을 합쳐서 참/거짓을 판단해요.",
+          code: `x = 15
+print(x > 10 and x < 20)  # True  (둘 다 참)
+print(x < 5 or x > 10)    # True  (하나라도 참)
+print(not x > 20)           # True  (반대)`
+        },
+        {
+          title: "복합 대입 연산자",
+          body: "변수 값을 바꿀 때 줄여서 쓸 수 있어요.",
+          code: `count = 0
+count += 1   # count = count + 1
+print(count)  # 1
+
+score = 100
+score -= 10   # score = score - 10
+print(score)  # 90
+
+score *= 2    # score = score * 2
+print(score)  # 180`
+        }
+      ],
+      keyPoints: [
+        "// 는 나눗셈의 몫, % 는 나머지예요",
+        "** 는 거듭제곱이에요 (2**10 = 1024)",
+        "비교 연산자 결과는 True 또는 False",
+        "== 는 같다, != 는 다르다, = 는 대입(저장)"
+      ]
+    },
+    examples: [
+      {
+        title: "용돈 계산기",
+        description: "연산자로 용돈을 계산해봐요",
+        code: `pocket_money = 50000
+snack = 3500
+lunch = 8000
+
+total_spent = snack + lunch
+remaining = pocket_money - total_spent
+
+print("쓴 돈:", total_spent, "원")
+print("남은 돈:", remaining, "원")
+print("절반 이상 썼나요?", total_spent > pocket_money // 2)`,
+        output: "쓴 돈: 11500 원\n남은 돈: 38500 원\n절반 이상 썼나요? False",
+        explanation: "산술 연산으로 계산하고, 비교 연산으로 True/False를 출력했어요."
+      },
+      {
+        title: "점수 판별하기",
+        description: "비교·논리 연산자로 조건을 확인해봐요",
+        code: `score = 78
+
+print("합격 여부:", score >= 60)
+print("우수 학생:", score >= 80 and score <= 100)
+print("재시험 대상:", score < 60 or score > 100)`,
+        output: "합격 여부: True\n우수 학생: False\n재시험 대상: False",
+        explanation: "비교 연산자와 논리 연산자를 함께 쓰면 복잡한 조건도 만들 수 있어요."
+      }
+    ]
+  },
+  {
+    unitId: 3,
+    concept: {
+      summary: "input() 함수로 사용자에게 값을 입력받아 인터랙티브한 프로그램을 만들어요.",
+      sections: [
+        {
+          title: "input() 함수",
+          body: "input()은 사용자가 키보드로 입력한 값을 문자열로 받아요. 괄호 안에 안내 문구를 쓸 수 있어요.",
+          code: `name = input("이름을 입력하세요: ")
+print("안녕하세요,", name + "님!")`
+        },
+        {
+          title: "숫자로 변환하기",
+          body: "input()은 항상 문자열을 반환해요. 숫자로 계산하려면 int() 또는 float()로 변환해야 해요.",
+          code: `# 문자열로 받기
+age_str = input("나이: ")   # "17" (문자열)
+
+# 정수로 변환
+age = int(age_str)           # 17 (정수)
+
+# 한 번에 변환
+height = float(input("키(cm): "))  # 175.5 (실수)
+
+print("10년 후 나이:", age + 10)`
+        },
+        {
+          title: "여러 값 입력받기",
+          body: "input()을 여러 번 호출해서 값을 따로 받을 수 있어요.",
+          code: `width = int(input("가로: "))
+height = int(input("세로: "))
+
+area = width * height
+print("넓이:", area)`
+        },
+        {
+          title: "자료형 변환 정리",
+          body: "변환 함수를 상황에 맞게 골라 써요.",
+          code: `s = "123"
+print(int(s))     # 123  (정수)
+print(float(s))   # 123.0 (실수)
+
+n = 456
+print(str(n))     # "456" (문자열로)
+
+# input()과 함께 자주 쓰는 패턴
+score = int(input("점수: "))
+price = float(input("가격: "))`
+        }
+      ],
+      keyPoints: [
+        "input()은 항상 문자열(str)을 반환해요",
+        "숫자로 계산하려면 int() 또는 float() 변환 필수",
+        "int()는 정수, float()는 소수점이 있는 숫자",
+        "str()로 숫자를 문자열로 변환할 수 있어요"
+      ]
+    },
+    examples: [
+      {
+        title: "자기소개 프로그램",
+        description: "input()으로 이름과 나이를 입력받아봐요",
+        code: `name = input("이름: ")
+age = int(input("나이: "))
+
+print("안녕하세요!")
+print("저는", name + "이에요.")
+print("나이는", age, "살이고, 10년 후엔", age+10, "살이에요.")`,
+        output: "안녕하세요!\n저는 홍길동이에요.\n나이는 17 살이고, 10년 후엔 27 살이에요.",
+        explanation: "input()으로 받은 이름은 그대로, 나이는 int()로 변환해서 계산에 사용했어요."
+      },
+      {
+        title: "간단한 계산기",
+        description: "두 숫자를 입력받아 사칙연산 결과를 출력해봐요",
+        code: `a = int(input("첫 번째 숫자: "))
+b = int(input("두 번째 숫자: "))
+
+print(a, "+", b, "=", a + b)
+print(a, "-", b, "=", a - b)
+print(a, "*", b, "=", a * b)
+print(a, "//", b, "=", a // b)`,
+        output: "3 + 5 = 8\n3 - 5 = -2\n3 * 5 = 15\n3 // 5 = 0",
+        explanation: "int(input())으로 숫자를 입력받아서 바로 연산할 수 있어요."
+      }
+    ]
+  },
+  {
+    unitId: 4,
     concept: {
       summary: "조건에 따라 다른 코드를 실행하는 if문을 배워요.",
       sections: [
@@ -114,7 +280,7 @@ print("남은 돈:", pocket_money - total_spent, "원")`,
 
 if score >= 60:
     print("합격!")
-    
+
 # 조건이 거짓이면 아무것도 실행 안 함`
         },
         {
@@ -142,8 +308,8 @@ else:
     print("F")`
         },
         {
-          title: "비교/논리 연산자",
-          body: "조건을 만들 때 사용하는 연산자들이에요.",
+          title: "비교/논리 연산자 활용",
+          body: "조건을 만들 때 비교·논리 연산자를 함께 써요.",
           code: `# 비교 연산자
 print(5 > 3)    # True
 print(5 == 5)   # True
@@ -200,7 +366,7 @@ print("등급:", grade)`,
     ]
   },
   {
-    unitId: 3,
+    unitId: 5,
     concept: {
       summary: "같은 코드를 반복 실행하는 for문과 while문을 배워요.",
       sections: [
@@ -289,7 +455,7 @@ print("1부터 100까지의 합:", total)`,
     ]
   },
   {
-    unitId: 4,
+    unitId: 6,
     concept: {
       summary: "반복해서 사용하는 코드를 함수로 묶어 재사용하는 방법을 배워요.",
       sections: [
@@ -354,7 +520,7 @@ print("6 x 7 =", multiply(6, 7))`,
     ]
   },
   {
-    unitId: 5,
+    unitId: 7,
     concept: {
       summary: "여러 데이터를 하나로 묶어 관리하는 리스트를 배워요.",
       sections: [
@@ -416,7 +582,7 @@ print("평균:", sum(scores) // len(scores))`,
     ]
   },
   {
-    unitId: 6,
+    unitId: 8,
     concept: {
       summary: "배운 모든 개념을 활용하는 심화 미션이에요. random, 문자열 처리 등 새로운 기능도 배워요.",
       sections: [

@@ -114,7 +114,7 @@ export default function StudentDashboard() {
             <div className="h-full bg-gradient-to-r from-blue-500 to-teal-400 rounded-full transition-all duration-700"
               style={{ width: `${progressPct}%` }} />
           </div>
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-8 gap-2">
             {unitProgress.map(u => (
               <div key={u.id} className="text-center">
                 <div className={`text-xs font-medium mb-1 ${u.passed === u.total && u.total > 0 ? 'text-teal-600' : 'text-gray-500'}`}>
