@@ -306,7 +306,7 @@ export default function ProfilePage() {
                   className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
                   Gemini →
                 </a>
-                <a href="https://console.groq.com/usage" target="_blank" rel="noopener"
+                <a href="https://console.groq.com/dashboard/metrics" target="_blank" rel="noopener"
                   className="text-xs px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors">
                   Groq →
                 </a>
