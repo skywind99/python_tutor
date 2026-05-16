@@ -118,6 +118,10 @@ export const MISSIONS: Mission[] = [
     template: `name = input("이름을 입력하세요: ")\n\n# 인사말을 출력하세요\n`,
     expectedOutput: "안녕하세요, 홍길동님!\n만나서 반가워요!",
     tags: ["input", "str", "print"], needsInput: true, defaultInput: "홍길동",
+    testCases: [
+      { label: "테스트 1", inputs: ["홍길동"], expectedOutput: "안녕하세요, 홍길동님!\n만나서 반가워요!" },
+      { label: "테스트 2", inputs: ["김영희"], expectedOutput: "안녕하세요, 김영희님!\n만나서 반가워요!" },
+    ],
     hints: [
       "💡 input()으로 받은 값은 name 변수에 저장돼요. 이 변수를 출력에 활용해봐요.",
       '🔍 "안녕하세요, " + name + "님!" 처럼 문자열을 이어 붙일 수 있어요.',
@@ -132,6 +136,10 @@ export const MISSIONS: Mission[] = [
     template: `width = int(input("가로: "))\nheight = int(input("세로: "))\n\n# 넓이와 둘레를 계산해서 출력하세요\n`,
     expectedOutput: "넓이: 15\n둘레: 16",
     tags: ["input", "int", "산술연산자"], needsInput: true, defaultInput: "5,3",
+    testCases: [
+      { label: "테스트 1", inputs: ["5", "3"], expectedOutput: "넓이: 15\n둘레: 16" },
+      { label: "테스트 2", inputs: ["7", "4"], expectedOutput: "넓이: 28\n둘레: 22" },
+    ],
     hints: [
       "💡 넓이 = 가로 × 세로, 둘레 = (가로 + 세로) × 2 예요.",
       "🔍 area = width * height, perimeter = (width + height) * 2 로 계산해요.",
@@ -148,6 +156,10 @@ export const MISSIONS: Mission[] = [
     template: `n = int(input("숫자를 입력하세요: "))\n\n# 홀짝 판별 코드를 작성하세요\n`,
     expectedOutput: "7은 홀수입니다.",
     tags: ["if", "else", "%", "input"], needsInput: true, defaultInput: "7",
+    testCases: [
+      { label: "테스트 1 (홀수)", inputs: ["7"], expectedOutput: "7은 홀수입니다." },
+      { label: "테스트 2 (짝수)", inputs: ["4"], expectedOutput: "4는 짝수입니다." },
+    ],
     hints: [
       "💡 2로 나눈 나머지가 0이면 짝수, 1이면 홀수예요. 나머지 연산자는 % 예요.",
       "🔍 if n % 2 == 0: 이면 짝수 조건이에요. else: 로 홀수 경우를 처리해요.",
@@ -162,6 +174,11 @@ export const MISSIONS: Mission[] = [
     template: `score = int(input("점수를 입력하세요: "))\n\n# 등급 판별 코드를 작성하세요\n`,
     expectedOutput: "B",
     tags: ["if", "elif", "else", "input"], needsInput: true, defaultInput: "85",
+    testCases: [
+      { label: "테스트 1 (B)", inputs: ["85"], expectedOutput: "B" },
+      { label: "테스트 2 (A)", inputs: ["95"], expectedOutput: "A" },
+      { label: "테스트 3 (F)", inputs: ["50"], expectedOutput: "F" },
+    ],
     hints: [
       "💡 여러 조건을 순서대로 검사할 때는 elif를 사용해요.",
       "🔍 if score >= 90: 부터 시작해서 elif score >= 80: 순서로 작성해요.",
@@ -282,6 +299,10 @@ export const MISSIONS: Mission[] = [
     template: `height = float(input("키(cm): "))\nweight = float(input("몸무게(kg): "))\n\n# BMI 계산 및 체형 판별\n`,
     expectedOutput: "정상 (BMI: 22.5)",
     tags: ["input", "float", "**", "if/elif"], needsInput: true, defaultInput: "170,65",
+    testCases: [
+      { label: "테스트 1 (정상)", inputs: ["170", "65"], expectedOutput: "정상 (BMI: 22.5)" },
+      { label: "테스트 2 (비만)", inputs: ["155", "80"], expectedOutput: "비만 (BMI: 33.3)" },
+    ],
     hints: [
       "💡 BMI = weight / (height/100) ** 2 으로 계산해요. ** 는 거듭제곱이에요.",
       "🔍 계산 후 round(bmi, 1) 로 소수점 1자리로 반올림해요.",
@@ -324,6 +345,10 @@ export const MISSIONS: Mission[] = [
     template: `text = input("암호화할 텍스트(대문자): ")\nshift = 3\nresult = ""\n\n# 각 문자를 3칸 밀어서 result에 더하세요\n\nprint(result)\n`,
     expectedOutput: "KHOOR",
     tags: ["for", "ord", "chr", "input", "%"], needsInput: true, defaultInput: "HELLO",
+    testCases: [
+      { label: "테스트 1", inputs: ["HELLO"], expectedOutput: "KHOOR" },
+      { label: "테스트 2", inputs: ["ABC"], expectedOutput: "DEF" },
+    ],
     hints: [
       "💡 ord('A') = 65, chr(65) = 'A'. ord()로 숫자로, chr()로 문자로 변환해요.",
       "🔍 (ord(c) - ord('A') + shift) % 26 + ord('A') 로 밀어낸 문자 코드를 구해요.",
