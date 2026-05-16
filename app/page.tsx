@@ -12,7 +12,7 @@ export default function Home() {
 
         <div className="grid grid-cols-3 gap-4 mb-8">
           {[
-            {icon:"🎯",title:"15개 미션",desc:"기초부터 심화까지"},
+            {icon:"🎯",title:"20개 미션",desc:"기초부터 심화까지"},
             {icon:"💎",title:"AI 힌트",desc:"소크라테스식 피드백"},
             {icon:"🏆",title:"랭킹 시스템",desc:"반 친구들과 경쟁"},
           ].map(f=>(

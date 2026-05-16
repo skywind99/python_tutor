@@ -156,7 +156,7 @@ export default function StudentDashboard() {
           {/* 반 랭킹 */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
             <h2 className="font-semibold text-gray-800 text-sm mb-4">
-              🏆 반 주간 랭킹
+              🏆 반 내 랭킹
               {ranking.length === 0 && <span className="text-xs text-gray-400 font-normal ml-2">(반 배정 후 활성화)</span>}
             </h2>
             {rankData.length > 0 ? (

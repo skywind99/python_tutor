@@ -75,7 +75,7 @@ export default function TeacherDashboard() {
   }).sort((a, b) => b.totalScore - a.totalScore)
 
   // 미션별 통과율
-  const missionStats = MISSIONS.slice(0, 7).map(m => {
+  const missionStats = MISSIONS.map(m => {
     const allLogs = students.flatMap(s => s.mission_logs || [])
     const mLogs = allLogs.filter((l: any) => l.mission_id === m.id)
     const passRate = mLogs.length > 0 ? Math.round((mLogs.filter((l: any) => l.passed).length / mLogs.length) * 100) : null
@@ -151,7 +151,7 @@ export default function TeacherDashboard() {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    {['순위','이름','완료 미션','총점','평균 힌트','취약 단계'].map(h => (
+                    {['순위','이름','완료 미션','총점','평균 힌트','힌트 의존도'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{h}</th>
                     ))}
                   </tr>
@@ -205,7 +205,7 @@ export default function TeacherDashboard() {
                         }`} style={{width:`${rate}%`}}/>
                       </div>
                       <div className="text-xs font-semibold text-gray-700 w-10 text-right">{rate}%</div>
-                      <div className="text-xs text-gray-400 w-16 flex-shrink-0">힌트 avg {m.avgHints}개</div>
+                      <div className="text-xs text-gray-400 w-16 flex-shrink-0">평균 힌트 {m.avgHints}개</div>
                     </div>
                   )
                 })}

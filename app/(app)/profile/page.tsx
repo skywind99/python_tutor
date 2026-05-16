@@ -279,7 +279,7 @@ export default function ProfilePage() {
             </div>
             {groqMsg && <p className={`text-xs ${groqMsg.startsWith('✓')?'text-teal-600':'text-red-500'}`}>{groqMsg}</p>}
             <p className="text-xs text-gray-400">
-              👉 <a href="https://console.groq.com" target="_blank" rel="noopener" className="text-orange-500 hover:underline">console.groq.com</a> → 구글 로그인 → API Keys → 무료 발급 (14,400회/일)
+              👉 <a href="https://console.groq.com" target="_blank" rel="noopener" className="text-orange-500 hover:underline">console.groq.com</a> → 구글 로그인 → API Keys → 무료 발급 (1,000회/일 · 100K 토큰/일)
             </p>
           </div>
 

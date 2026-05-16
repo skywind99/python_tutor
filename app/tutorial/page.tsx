@@ -113,12 +113,12 @@ function FillBlankPage({ page, onPass }: { page: TutorialPage; onPass: () => voi
     let blankIdx = 0
     const parts = page.codeTemplate.split(/\[___(?:\d+)?___\]/)
     return parts.map((part, i) => {
+      const currentIdx = blankIdx
       const inputEl = i < parts.length - 1 ? (
         <input key={`inp-${i}`}
-          value={inputs[blankIdx] || ''}
+          value={inputs[currentIdx] || ''}
           onChange={e => {
-            const idx = blankIdx
-            setInputs(prev => { const n = [...prev]; n[idx] = e.target.value; return n })
+            setInputs(prev => { const n = [...prev]; n[currentIdx] = e.target.value; return n })
             setChecked(false)
           }}
           className="inline-block font-mono text-sm px-2 py-0.5 rounded border min-w-16 text-center outline-none transition-colors"
@@ -126,9 +126,9 @@ function FillBlankPage({ page, onPass }: { page: TutorialPage; onPass: () => voi
             background: checked ? (correct ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)') : 'rgba(255,255,255,0.2)',
             borderColor: checked ? (correct ? '#4ade80' : '#f87171') : 'rgba(255,255,255,0.4)',
             color: '#fff',
-            width: Math.max(80, (inputs[blankIdx]?.length || 4) * 10 + 20) + 'px',
+            width: Math.max(80, (inputs[currentIdx]?.length || 4) * 10 + 20) + 'px',
           }}
-          placeholder={page.blankLabels?.[blankIdx] || '???'}
+          placeholder={page.blankLabels?.[currentIdx] || '???'}
           disabled={checked && correct}
         />
       ) : null

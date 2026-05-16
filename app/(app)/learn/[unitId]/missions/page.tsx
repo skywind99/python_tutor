@@ -1,10 +1,13 @@
 'use client'
 import { useParams } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { MISSIONS, UNITS, LEVEL_INFO, calcScore } from '@/data/missions'
 import type { Mission } from '@/data/missions'
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
+
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false })
 
 declare global { interface Window { Sk: any } }
 
@@ -53,7 +56,6 @@ export default function MissionsPage() {
   const [hintCount, setHintCount] = useState(0)
   const [hintLoading, setHintLoading] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
-  const [tab, setTab] = useState<'output'|'hint'>('output')
   const [running, setRunning] = useState(false)
   const [pyReady, setPyReady] = useState(false)
   const [score, setScore] = useState(0)
@@ -68,8 +70,13 @@ export default function MissionsPage() {
   const [userId, setUserId] = useState<string|null>(null)
   const gemIdRef = useRef(0)
 
+  // Lottie animation data
+  const [successAnim, setSuccessAnim] = useState<any>(null)
+  const [hintAnim, setHintAnim] = useState<any>(null)
+  const [showSuccessLottie, setShowSuccessLottie] = useState(false)
+  const [showHintLottie, setShowHintLottie] = useState(false)
+
   useEffect(() => {
-    // Load Skulpt
     const s1 = document.createElement('script')
     s1.src = 'https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js'
     s1.onload = () => {
@@ -80,17 +87,16 @@ export default function MissionsPage() {
     }
     document.head.appendChild(s1)
 
-    // Load user + progress via API
+    // 성공 애니메이션 미리 로드
+    fetch('/lottie/success.json').then(r => r.json()).then(setSuccessAnim).catch(() => {})
+
     async function loadUserProgress() {
       const sb = getClient()
       const { data: { user } } = await sb.auth.getUser()
       if (!user) return
       setUserId(user.id)
-
       const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).single()
       if (prof) setRole(prof.role)
-
-      // API로 진도 불러오기
       try {
         const res = await fetch('/api/progress')
         const data = await res.json()
@@ -108,7 +114,6 @@ export default function MissionsPage() {
         setXp(totalScore % 1000)
         setLevel(Math.floor(totalScore / 1000) + 1)
       } catch (e) { console.error('Load progress failed:', e) }
-
       const initialPile = Array.from({length:28}, () => GEM_TYPES[Math.floor(Math.random()*GEM_TYPES.length)])
       setPile(initialPile)
     }
@@ -117,7 +122,7 @@ export default function MissionsPage() {
 
   const changeMission = (m: Mission) => {
     setCurrent(m); setCode(m.template); setOutput(''); setOutputOk(null)
-    setDiffMsg(''); setTestResults([]); setChatMessages([]); setChatInput(''); setHintCount(0); setTab('output')
+    setDiffMsg(''); setTestResults([]); setChatMessages([]); setChatInput(''); setHintCount(0)
   }
 
   const scrollToBottom = useCallback(() => {
@@ -126,10 +131,9 @@ export default function MissionsPage() {
 
   const runCode = async () => {
     if (!pyReady || running) return
-    setRunning(true); setTab('output')
+    setRunning(true)
     const Sk = window.Sk
 
-    // 테스트 케이스가 있으면 각각 실행
     if (current.testCases && current.testCases.length > 0) {
       setTestResults([])
       const results: {label:string;passed:boolean;actual:string;expected:string;inputs:string[]}[] = []
@@ -157,7 +161,6 @@ export default function MissionsPage() {
       return
     }
 
-    // 일반 실행 (testCases 없음)
     const inputs = (current.defaultInput || '').split(',').map((s: string) => s.trim())
     let out = ''; let inputIdx = 0
     try {
@@ -192,19 +195,11 @@ export default function MissionsPage() {
   const onPass = async (actualOutput: string) => {
     const s = calcScore(current.level, hintCount)
     const gemN = LEVEL_INFO[current.level].gemCount + (hintCount===0?5:0)
-
-    // API 통해서 저장 (서버사이드 auth)
     try {
       await fetch('/api/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          missionId: current.id,
-          passed: true,
-          hintsUsed: hintCount,
-          score: s,
-          code: code
-        })
+        body: JSON.stringify({ missionId: current.id, passed: true, hintsUsed: hintCount, score: s, code })
       })
     } catch (e) { console.error('Save failed:', e) }
 
@@ -213,6 +208,11 @@ export default function MissionsPage() {
     setXp(prev => { const nx = prev + Math.floor(s/3); if(nx>=1000){setLevel(l=>l+1);return nx-1000} return nx })
     setScorePopup({ text: `+${s}` })
     setTimeout(() => setScorePopup(null), 1500)
+
+    // Lottie 성공 애니메이션
+    if (successAnim) {
+      setShowSuccessLottie(true)
+    }
 
     for (let i=0; i<gemN; i++) {
       setTimeout(() => {
@@ -237,10 +237,21 @@ export default function MissionsPage() {
     if (hintLoading) return
     const userMsg = message.trim()
     setHintLoading(true)
-    setTab('hint')
     if (userMsg) setChatMessages(prev => [...prev, { role: 'user', text: userMsg }])
     setChatInput('')
     setTimeout(scrollToBottom, 50)
+
+    // Lottie 힌트 애니메이션 (첫 요청 시 lazy load)
+    if (!hintAnim) {
+      fetch('/lottie/hint.json').then(r => r.json()).then(data => {
+        setHintAnim(data)
+        setShowHintLottie(true)
+        setTimeout(() => setShowHintLottie(false), 2200)
+      }).catch(() => {})
+    } else {
+      setShowHintLottie(true)
+      setTimeout(() => setShowHintLottie(false), 2200)
+    }
 
     try {
       const res = await fetch('/api/hint', {
@@ -268,245 +279,346 @@ export default function MissionsPage() {
 
   const xpPct = Math.min((xp/1000)*100,100)
   const ringArc = Math.round((xp/1000)*94)
+  const lv = LEVEL_INFO[current.level]
 
   return (
-    <div className="flex bg-gray-50 overflow-hidden" style={{height:'calc(100vh - 3.5rem)'}}>
-      {/* Sidebar */}
-      <div className="w-52 bg-white border-r border-gray-100 flex flex-col overflow-y-auto flex-shrink-0">
-        <div className="p-4 border-b border-gray-50">
-          <Link href="/learn" className="text-xs text-gray-400 hover:text-gray-600 mb-2 block">← 단원 목록</Link>
-          <div className="text-xs font-semibold text-gray-400">단원 {unitId}</div>
-          <div className="font-semibold text-gray-800 text-sm">{unit?.title}</div>
-          {/* 단원 내 탭 */}
+    <div className="flex overflow-hidden" style={{height:'calc(100vh - 3.5rem)',background:'#0d1117'}}>
+
+      {/* ── 사이드바: 미션 목록 ── */}
+      <div className="w-52 flex flex-col overflow-y-auto flex-shrink-0" style={{background:'#161b22',borderRight:'1px solid #30363d'}}>
+        <div className="p-4" style={{borderBottom:'1px solid #30363d'}}>
+          <Link href="/learn" className="text-xs hover:opacity-80 mb-2 block transition-opacity" style={{color:'#8b949e'}}>← 단원 목록</Link>
+          <div className="text-xs font-semibold mb-0.5" style={{color:'#8b949e'}}>단원 {unitId}</div>
+          <div className="font-semibold text-sm text-white">{unit?.title}</div>
           <div className="flex gap-1 mt-2">
-            <Link href={`/learn/${unitId}/concept`} className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100">📖</Link>
-            <Link href={`/learn/${unitId}/examples`} className="text-xs px-2 py-1 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-100">💻</Link>
-            <span className="text-xs px-2 py-1 rounded-lg bg-orange-50 text-orange-600 font-medium">🎯</span>
+            <Link href={`/learn/${unitId}/concept`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>📖</Link>
+            <Link href={`/learn/${unitId}/examples`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>💻</Link>
+            <span className="text-xs px-2 py-1 rounded-lg font-medium" style={{background:'rgba(249,115,22,0.15)',color:'#fb923c'}}>🎯</span>
           </div>
         </div>
         {missions.map(m => {
           const lv = LEVEL_INFO[m.level]; const done = passed[m.id]; const active = current.id===m.id
           return (
             <button key={m.id} onClick={() => changeMission(m)}
-              className={`text-left p-3 border-b border-gray-50 transition-colors ${active?'bg-blue-50 border-l-2 border-l-blue-500':'hover:bg-gray-50'}`}>
+              className="text-left p-3 transition-colors"
+              style={{
+                borderBottom:'1px solid #21262d',
+                background: active ? 'rgba(31,111,235,0.15)' : 'transparent',
+                borderLeft: active ? '2px solid #1f6feb' : '2px solid transparent',
+              }}>
               <div className="flex items-center gap-1.5 mb-1">
-                {done ? <span className="text-teal-500 text-xs font-bold">✓</span> : <span className="text-gray-200 text-xs">○</span>}
-                <span className="text-xs font-semibold text-gray-800 truncate">{m.title}</span>
+                {done
+                  ? <span className="text-xs font-bold" style={{color:'#3fb950'}}>✓</span>
+                  : <span className="text-xs" style={{color:'#30363d'}}>○</span>}
+                <span className="text-xs font-semibold text-white truncate">{m.title}</span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-xs px-1.5 py-0.5 rounded-full" style={{background:lv.bg,color:lv.text}}>{lv.label}</span>
-                {done && <span className="text-xs text-gray-400">{done.score}점</span>}
+                {done && <span className="text-xs" style={{color:'#8b949e'}}>{done.score}점</span>}
               </div>
             </button>
           )
         })}
         {role === 'teacher' && (
-          <Link href="/teacher/create-mission" className="m-3 py-2 text-center text-xs bg-blue-50 text-blue-600 rounded-xl font-medium hover:bg-blue-100 transition-colors">
+          <Link href="/teacher/create-mission" className="m-3 py-2 text-center text-xs rounded-xl font-medium transition-colors" style={{background:'rgba(31,111,235,0.15)',color:'#58a6ff'}}>
             ✨ 문제 만들기
           </Link>
         )}
       </div>
 
-      {/* Main */}
+      {/* ── 메인: 좌우 분할 ── */}
       <div className="flex-1 flex overflow-hidden min-w-0">
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Problem */}
-          <div className="bg-white border-b border-gray-100 p-4 overflow-y-auto flex-[2] min-h-0">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm font-semibold text-gray-900">{current.title}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{background:LEVEL_INFO[current.level].bg,color:LEVEL_INFO[current.level].text}}>
-                {LEVEL_INFO[current.level].label}
-              </span>
-              {passed[current.id] && <span className="text-xs text-teal-600 font-semibold ml-auto">✓ 완료 ({passed[current.id].score}점)</span>}
-              <div className="flex gap-1 ml-auto">
-                {current.tags.map(t=><span key={t} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono">{t}</span>)}
-              </div>
-            </div>
-            <pre className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">{current.description}</pre>
-          </div>
 
-          {/* Output/Hint tabs */}
-          <div className="bg-white border-b border-gray-100 flex flex-col flex-[2] min-h-0">
-            <div className="flex border-b border-gray-100 flex-shrink-0">
-              {(['output','hint'] as const).map(t=>(
-                <button key={t} onClick={()=>setTab(t)}
-                  className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${tab===t?'border-blue-500 text-blue-600':'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                  {t==='output'?'실행 결과':`AI 힌트${hintCount>0?` (${hintCount}/3)`:''}`}
-                </button>
+        {/* ── 좌측 패널: 문제 설명 + AI 채팅 ── */}
+        <div className="flex flex-col overflow-hidden flex-shrink-0" style={{width:'42%',background:'#ffffff',borderRight:'1px solid #e5e7eb'}}>
+
+          {/* 문제 설명 */}
+          <div className="overflow-y-auto p-5" style={{flex:'3 1 0%',minHeight:0,borderBottom:'1px solid #e5e7eb'}}>
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="font-bold text-gray-900 text-sm">{current.title}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{background:lv.bg,color:lv.text}}>
+                {lv.label}
+              </span>
+              {passed[current.id] && (
+                <span className="text-xs font-semibold ml-auto" style={{color:'#059669'}}>✓ 완료 · {passed[current.id].score}점</span>
+              )}
+            </div>
+            <div className="flex gap-1 flex-wrap mb-4">
+              {current.tags.map(t=>(
+                <span key={t} className="text-xs px-1.5 py-0.5 rounded font-mono" style={{background:'#f3f4f6',color:'#6b7280'}}>{t}</span>
               ))}
             </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              {tab==='output' ? (
-                testResults.length > 0 ? (
-                  <div className="space-y-2">
-                    {testResults.map((r, i) => (
-                      <div key={i} className={`rounded-xl p-2.5 ${r.passed ? 'bg-teal-50' : 'bg-red-50'}`}>
-                        <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className={`text-xs font-semibold ${r.passed ? 'text-teal-600' : 'text-red-500'}`}>
-                            {r.passed ? '✓' : '✗'} {r.label}
-                          </span>
-                          <span className="text-xs text-gray-400">입력: {r.inputs.join(' / ')}</span>
-                        </div>
-                        <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap">{r.actual || '(출력 없음)'}</pre>
-                        {!r.passed && (
-                          <div className="mt-1.5 pt-1.5 border-t border-red-200">
-                            <div className="text-xs text-red-400">예상:</div>
-                            <pre className="text-xs font-mono text-red-400 whitespace-pre-wrap">{r.expected}</pre>
-                          </div>
-                        )}
+            <pre className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">{current.description}</pre>
+            {current.testCases && (
+              <div className="mt-4 rounded-xl px-3 py-2.5" style={{background:'#eef2ff',border:'1px solid #c7d2fe'}}>
+                <span className="text-xs font-semibold" style={{color:'#4338ca'}}>🧪 {current.testCases.length}가지 입력으로 자동 검증돼요</span>
+              </div>
+            )}
+            {current.needsInput && !current.testCases && (
+              <div className="mt-4 rounded-xl px-3 py-2.5" style={{background:'#f0fdf4',border:'1px solid #bbf7d0'}}>
+                <div className="text-xs font-semibold mb-1.5" style={{color:'#059669'}}>⌨️ 테스트 입력값</div>
+                <input
+                  className="text-xs font-mono border rounded px-2 py-1 outline-none w-full"
+                  style={{borderColor:'#d1fae5',background:'white'}}
+                  defaultValue={current.defaultInput}
+                  onChange={e=>{(current as any)._testInput=e.target.value}}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* AI 튜터 채팅 */}
+          <div className="flex flex-col overflow-hidden" style={{flex:'4 1 0%',minHeight:0,background:'#f9fafb'}}>
+            {/* 채팅 헤더 */}
+            <div className="flex items-center gap-2 px-4 py-2.5 flex-shrink-0 relative" style={{background:'white',borderBottom:'1px solid #e5e7eb'}}>
+              <span className="text-base">🤖</span>
+              <span className="text-xs font-semibold text-gray-700">AI 튜터</span>
+              {hintCount > 0 && (
+                <span className="text-xs ml-1" style={{color:'#9ca3af'}}>힌트 {hintCount}회 사용</span>
+              )}
+              {hintLoading && (
+                <span className="text-xs ml-auto animate-pulse" style={{color:'#6366f1'}}>생각 중...</span>
+              )}
+              {/* 힌트 Lottie - 헤더 위에 팝업 */}
+              {showHintLottie && hintAnim && (
+                <div className="absolute right-3 -top-16 z-20 pointer-events-none" style={{width:64,height:64}}>
+                  <Lottie animationData={hintAnim} loop={false} />
+                </div>
+              )}
+            </div>
+
+            {/* 메시지 목록 */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+              {chatMessages.length === 0 && !hintLoading && (
+                <div className="text-center mt-6 leading-relaxed">
+                  <div className="text-2xl mb-2">💬</div>
+                  <p className="text-xs" style={{color:'#9ca3af'}}>AI 튜터에게 질문하거나<br/>코드를 분석 받아보세요!</p>
+                </div>
+              )}
+              {chatMessages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[88%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
+                    m.role === 'user'
+                      ? 'text-white rounded-br-sm'
+                      : 'text-gray-700 rounded-bl-sm'
+                  }`} style={m.role === 'user'
+                    ? {background:'#2563eb'}
+                    : {background:'white',border:'1px solid #e5e7eb',boxShadow:'0 1px 2px rgba(0,0,0,0.06)'}
+                  }>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              {hintLoading && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl rounded-bl-sm px-3 py-2 text-xs flex items-center gap-1"
+                    style={{background:'white',border:'1px solid #e5e7eb',color:'#9ca3af'}}>
+                    <span className="animate-bounce">●</span>
+                    <span className="animate-bounce" style={{animationDelay:'0.15s'}}>●</span>
+                    <span className="animate-bounce" style={{animationDelay:'0.3s'}}>●</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* 입력창 */}
+            <div className="p-2 flex gap-1.5 flex-shrink-0" style={{background:'white',borderTop:'1px solid #e5e7eb'}}>
+              <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
+                className="px-2.5 py-2 text-xs rounded-lg border transition-colors disabled:opacity-40 whitespace-nowrap font-medium"
+                style={{borderColor:'#e5e7eb',color:'#374151'}}>
+                💡 분석
+              </button>
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
+                placeholder="질문하세요..."
+                className="flex-1 text-xs border rounded-lg px-3 py-2 outline-none min-w-0"
+                style={{borderColor:'#e5e7eb'}}
+                disabled={hintLoading}
+              />
+              <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
+                className="px-3 py-2 text-xs font-semibold text-white rounded-lg transition-colors disabled:opacity-40"
+                style={{background:'#2563eb'}}>
+                전송
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 우측 패널: 코드 에디터 + 실행 결과 ── */}
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden" style={{background:'#0d1117'}}>
+
+          {/* 코드 에디터 헤더 */}
+          <div className="flex items-center justify-between px-4 py-2 flex-shrink-0"
+            style={{background:'#161b22',borderBottom:'1px solid #30363d'}}>
+            <span className="text-xs font-mono" style={{color:'#8b949e'}}>Python</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs" style={{color: pyReady ? '#3fb950' : '#8b949e'}}>
+                {pyReady ? '● 준비됨' : '● 로딩 중...'}
+              </span>
+              <button onClick={runCode} disabled={!pyReady||running}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-40 active:scale-95"
+                style={{background:running?'#1f6feb':'#238636',color:'#ffffff'}}>
+                {running ? '⏳ 실행 중...' : '▶  실행'}
+              </button>
+            </div>
+          </div>
+
+          {/* 코드 textarea */}
+          <textarea
+            value={code}
+            onChange={e=>setCode(e.target.value)}
+            className="p-4 font-mono text-sm border-none outline-none resize-none overflow-auto"
+            style={{
+              flex:'5 1 0%', minHeight:0,
+              background:'#0d1117',
+              color:'#e6edf3',
+              caretColor:'#e6edf3',
+              lineHeight:'1.7',
+              tabSize:4,
+            }}
+            spellCheck={false}
+          />
+
+          {/* 실행 결과 영역 */}
+          <div className="flex flex-col overflow-hidden" style={{flex:'3 1 0%',minHeight:0,background:'#161b22',borderTop:'1px solid #30363d'}}>
+            <div className="flex items-center gap-3 px-4 py-2 flex-shrink-0" style={{borderBottom:'1px solid #21262d'}}>
+              <span className="text-xs font-semibold" style={{color:'#8b949e'}}>실행 결과</span>
+              {outputOk === true && (
+                <span className="text-xs font-bold" style={{color:'#3fb950'}}>✓ 정답!</span>
+              )}
+              {outputOk === false && (
+                <span className="text-xs font-bold" style={{color:'#f85149'}}>✗ 아직 아니에요</span>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
+              {testResults.length > 0 ? (
+                <div className="space-y-2">
+                  {testResults.map((r, i) => (
+                    <div key={i} className="rounded-lg p-2.5"
+                      style={{
+                        background: r.passed ? 'rgba(63,185,80,0.08)' : 'rgba(248,81,73,0.08)',
+                        border: `1px solid ${r.passed ? '#238636' : '#da3633'}`,
+                      }}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs font-bold" style={{color: r.passed ? '#3fb950' : '#f85149'}}>
+                          {r.passed ? '✓' : '✗'} {r.label}
+                        </span>
+                        <span className="text-xs" style={{color:'#6e7681'}}>입력: {r.inputs.join(' / ')}</span>
                       </div>
-                    ))}
-                    {outputOk === true && <div className="text-xs text-teal-600 font-semibold text-center pt-1">🎉 모든 테스트 통과!</div>}
-                  </div>
-                ) : output ? (
-                  <div>
-                    <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap mb-2">{output}</pre>
-                    {outputOk===true && <div className="text-xs text-teal-600 font-semibold">✓ 정답!</div>}
-                    {outputOk===false && <div>
-                      <div className="text-xs text-red-500 font-semibold mb-1">✗ 아직 아니에요</div>
-                      {diffMsg && <div className="text-xs text-red-400 bg-red-50 rounded p-2">{diffMsg}</div>}
-                    </div>}
-                  </div>
-                ) : <div className="text-xs text-gray-400 text-center mt-6">실행 버튼을 눌러보세요</div>
+                      <pre className="text-xs font-mono whitespace-pre-wrap" style={{color:'#c9d1d9'}}>{r.actual || '(출력 없음)'}</pre>
+                      {!r.passed && (
+                        <div className="mt-1.5 pt-1.5" style={{borderTop:'1px solid rgba(218,54,51,0.3)'}}>
+                          <span className="text-xs" style={{color:'#f85149'}}>예상: </span>
+                          <pre className="text-xs font-mono whitespace-pre-wrap inline" style={{color:'#f85149'}}>{r.expected}</pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {outputOk === true && (
+                    <div className="text-xs text-center font-bold pt-1" style={{color:'#3fb950'}}>
+                      🎉 모든 테스트 케이스 통과!
+                    </div>
+                  )}
+                </div>
+              ) : output ? (
+                <div>
+                  <pre className="text-xs font-mono whitespace-pre-wrap mb-2" style={{color:'#c9d1d9'}}>{output}</pre>
+                  {outputOk===false && diffMsg && (
+                    <div className="text-xs rounded-lg px-3 py-2 mt-2"
+                      style={{background:'rgba(248,81,73,0.1)',color:'#f85149',border:'1px solid rgba(218,54,51,0.4)'}}>
+                      {diffMsg}
+                    </div>
+                  )}
+                </div>
               ) : (
-                <div className="flex flex-col h-full">
-                  <div className="flex-1 overflow-y-auto space-y-2 pb-1">
-                    {chatMessages.length === 0 && !hintLoading && (
-                      <div className="text-xs text-gray-400 text-center mt-4 leading-relaxed">
-                        💬 AI 튜터에게 물어보세요<br/>
-                        <span className="text-gray-300">코드 분석, 오류 설명, 방향 힌트 등</span>
-                      </div>
-                    )}
-                    {chatMessages.map((m, i) => (
-                      <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
-                          m.role === 'user'
-                            ? 'bg-blue-500 text-white rounded-br-sm'
-                            : 'bg-gray-100 text-gray-700 rounded-bl-sm'
-                        }`}>
-                          {m.text}
-                        </div>
-                      </div>
-                    ))}
-                    {hintLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-3 py-2 text-xs text-gray-400 flex items-center gap-1">
-                          <span className="animate-bounce">●</span>
-                          <span className="animate-bounce" style={{animationDelay:'0.15s'}}>●</span>
-                          <span className="animate-bounce" style={{animationDelay:'0.3s'}}>●</span>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={chatEndRef} />
-                  </div>
+                <div className="text-center mt-6">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <p className="text-xs" style={{color:'#6e7681'}}>▶ 실행 버튼을 눌러 결과를 확인하세요</p>
                 </div>
               )}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Code editor */}
-          <div className="flex-[3] flex flex-col min-h-0">
-            <textarea value={code} onChange={e=>setCode(e.target.value)}
-              className="flex-1 p-4 font-mono text-sm text-gray-800 bg-gray-50 border-none outline-none resize-none overflow-auto" spellCheck={false}/>
-            {current.needsInput && !current.testCases && (
-              <div className="bg-white border-t border-gray-100 px-4 py-2 flex items-center gap-3 flex-none">
-                <span className="text-xs text-gray-400">테스트 입력</span>
-                <input className="flex-1 text-xs font-mono border border-gray-200 rounded px-2 py-1 outline-none" defaultValue={current.defaultInput}
-                  onChange={e=>{(current as any)._testInput=e.target.value}}/>
-              </div>
-            )}
-            {current.testCases && (
-              <div className="bg-indigo-50 border-t border-indigo-100 px-4 py-1.5 flex items-center gap-2 flex-none">
-                <span className="text-xs text-indigo-500 font-medium">🧪 {current.testCases.length}가지 케이스로 자동 검증돼요</span>
-              </div>
-            )}
+      {/* ── Gem Vault ── */}
+      <div className="w-56 flex-shrink-0 flex flex-col relative" style={{background:'#140e04'}}>
+        <div className="relative z-10 p-3 flex justify-between items-start">
+          <div>
+            <div className="text-xs font-semibold tracking-widest" style={{color:'rgba(255,200,80,0.7)'}}>VAULT</div>
+            <div className="text-xs mt-1" style={{color:'rgba(255,200,80,0.4)'}}>
+              {Object.keys(passed).length}/{MISSIONS.length} 미션
+            </div>
           </div>
-
-          {/* 하단 고정 버튼바 */}
-          <div className="bg-white border-t border-gray-100 px-4 py-2.5 flex gap-2 items-center flex-none">
-            <button onClick={runCode} disabled={!pyReady||running}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 transition-colors">
-              {running?'실행 중...':'▶ 실행'}
-            </button>
-            <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap">
-              💡 분석
-            </button>
-            <input
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
-              placeholder="AI 튜터에게 질문하세요..."
-              className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-300"
-              disabled={hintLoading}
-            />
-            <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
-              className="px-3 py-2 text-xs font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-40 transition-colors">
-              전송
-            </button>
-            <div className="text-xs text-gray-400 whitespace-nowrap">{pyReady?'🟢':'⏳'}</div>
+          <div className="flex flex-col items-center">
+            <div className="text-xs" style={{color:'rgba(255,200,80,0.5)'}}>LV</div>
+            <div className="text-base font-semibold" style={{color:'rgba(255,200,80,0.9)'}}>{level}</div>
+            <svg width="34" height="34" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,200,80,0.15)" strokeWidth="3"/>
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#FFD700" strokeWidth="3"
+                strokeDasharray={`${ringArc} ${94-ringArc}`} strokeDashoffset="23.5" strokeLinecap="round"
+                transform="rotate(-90 18 18)"/>
+            </svg>
           </div>
         </div>
 
-        {/* Gem Vault */}
-        <div className="w-56 flex-shrink-0 flex flex-col relative" style={{background:'#140e04'}}>
-          <div className="relative z-10 p-3 flex justify-between items-start">
-            <div>
-              <div className="text-xs font-semibold tracking-widest" style={{color:'rgba(255,200,80,0.7)'}}>VAULT</div>
-              <div className="text-xs mt-1" style={{color:'rgba(255,200,80,0.4)'}}>
-                {Object.keys(passed).length}/{MISSIONS.length} 미션
+        <div className="relative flex-1 overflow-hidden mx-2 rounded-lg" style={{background:'rgba(0,0,0,0.2)'}}>
+          {gems.map(g=>(
+            <div key={g.id} className="absolute" style={{left:`${g.x}%`,top:0,animation:'fall 0.9s ease-in forwards'}}>
+              <GemSVG type={g.type} size={22}/>
+            </div>
+          ))}
+          {scorePopup && (
+            <div className="absolute z-10 left-1/2 -translate-x-1/2 text-base font-semibold font-mono"
+              style={{bottom:80,color:'#FFD700',animation:'scoreUp 1.4s ease-out forwards',textShadow:'0 0 8px rgba(255,200,0,0.8)'}}>
+              {scorePopup.text}
+            </div>
+          )}
+          {celebration && (
+            <div className="absolute inset-0 flex items-center justify-center z-20 p-2">
+              <div className="text-center text-xs font-semibold rounded-xl px-3 py-2"
+                style={{background:'rgba(255,200,0,0.95)',color:'#3d2000',animation:'popIn 0.3s ease'}}>
+                {celebration}
               </div>
             </div>
-            <div className="flex flex-col items-center">
-              <div className="text-xs" style={{color:'rgba(255,200,80,0.5)'}}>LV</div>
-              <div className="text-base font-semibold" style={{color:'rgba(255,200,80,0.9)'}}>{level}</div>
-              <svg width="34" height="34" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,200,80,0.15)" strokeWidth="3"/>
-                <circle cx="18" cy="18" r="15" fill="none" stroke="#FFD700" strokeWidth="3"
-                  strokeDasharray={`${ringArc} ${94-ringArc}`} strokeDashoffset="23.5" strokeLinecap="round"
-                  transform="rotate(-90 18 18)"/>
-              </svg>
-            </div>
+          )}
+          <div className="absolute bottom-0 left-0 right-0 flex flex-wrap justify-center items-end gap-0.5 p-1" style={{minHeight:50}}>
+            {pile.slice(-50).map((t,i)=><GemSVG key={i} type={t} size={11}/>)}
           </div>
+        </div>
 
-          <div className="relative flex-1 overflow-hidden mx-2 rounded-lg" style={{background:'rgba(0,0,0,0.2)'}}>
-            {gems.map(g=>(
-              <div key={g.id} className="absolute" style={{left:`${g.x}%`,top:0,animation:'fall 0.9s ease-in forwards'}}>
-                <GemSVG type={g.type} size={22}/>
-              </div>
-            ))}
-            {scorePopup && (
-              <div className="absolute z-10 left-1/2 -translate-x-1/2 text-base font-semibold font-mono"
-                style={{bottom:80,color:'#FFD700',animation:'scoreUp 1.4s ease-out forwards',textShadow:'0 0 8px rgba(255,200,0,0.8)'}}>
-                {scorePopup.text}
-              </div>
-            )}
-            {celebration && (
-              <div className="absolute inset-0 flex items-center justify-center z-20 p-2">
-                <div className="text-center text-xs font-semibold rounded-xl px-3 py-2"
-                  style={{background:'rgba(255,200,0,0.95)',color:'#3d2000',animation:'popIn 0.3s ease'}}>
-                  {celebration}
-                </div>
-              </div>
-            )}
-            <div className="absolute bottom-0 left-0 right-0 flex flex-wrap justify-center items-end gap-0.5 p-1" style={{minHeight:50}}>
-              {pile.slice(-50).map((t,i)=><GemSVG key={i} type={t} size={11}/>)}
+        <div className="relative z-10 p-3" style={{borderTop:'1px solid rgba(255,180,50,0.1)'}}>
+          <div className="text-xs mb-1" style={{color:'rgba(255,200,80,0.5)',letterSpacing:'0.1em'}}>TOTAL</div>
+          <div className="text-2xl font-semibold font-mono" style={{color:'#FFD700'}}>{score.toLocaleString()}</div>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="text-xs" style={{color:'rgba(255,200,80,0.4)'}}>XP</div>
+            <div className="flex-1 h-1 rounded-full" style={{background:'rgba(255,255,255,0.1)'}}>
+              <div className="h-1 rounded-full transition-all duration-700" style={{width:`${xpPct}%`,background:'#FFD700'}}/>
             </div>
-          </div>
-
-          <div className="relative z-10 p-3" style={{borderTop:'1px solid rgba(255,180,50,0.1)'}}>
-            <div className="text-xs mb-1" style={{color:'rgba(255,200,80,0.5)',letterSpacing:'0.1em'}}>TOTAL</div>
-            <div className="text-2xl font-semibold font-mono" style={{color:'#FFD700'}}>{score.toLocaleString()}</div>
-            <div className="flex items-center gap-2 mt-2">
-              <div className="text-xs" style={{color:'rgba(255,200,80,0.4)'}}>XP</div>
-              <div className="flex-1 h-1 rounded-full" style={{background:'rgba(255,255,255,0.1)'}}>
-                <div className="h-1 rounded-full transition-all duration-700" style={{width:`${xpPct}%`,background:'#FFD700'}}/>
-              </div>
-              <div className="text-xs" style={{color:'rgba(255,200,80,0.5)'}}>{xp}</div>
-            </div>
+            <div className="text-xs" style={{color:'rgba(255,200,80,0.5)'}}>{xp}</div>
           </div>
         </div>
       </div>
+
+      {/* ── Lottie 성공 오버레이 ── */}
+      {showSuccessLottie && successAnim && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{background:'rgba(0,0,0,0.25)'}}
+        >
+          <div style={{width:340,height:340}}>
+            <Lottie
+              animationData={successAnim}
+              loop={false}
+              onComplete={() => setShowSuccessLottie(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes fall { 0%{transform:translateY(-20px) rotate(0deg);opacity:0} 10%{opacity:1} 100%{transform:translateY(300px) rotate(180deg);opacity:0.9} }
