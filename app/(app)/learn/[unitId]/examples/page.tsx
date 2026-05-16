@@ -18,12 +18,11 @@ export default function ExamplesPage() {
   const unit = UNITS.find(u => u.id === unitId)
   const content = UNIT_CONTENTS.find(c => c.unitId === unitId)
   const [role, setRole] = useState('student')
-  const [editMode, setEditMode] = useState(false)
   const [pyReady, setPyReady] = useState(false)
   const [outputs, setOutputs] = useState<Record<number, {text:string, isError:boolean}>>({})
   const [running, setRunning] = useState<number | null>(null)
-  // 수정된 코드를 상태로 관리 (원본 + 편집 내용)
   const [codes, setCodes] = useState<Record<number, string>>({})
+  const [inputValues, setInputValues] = useState<Record<number, string[]>>({})
 
   useEffect(() => {
     getClient().auth.getUser().then(({ data: { user } }) => {
@@ -31,11 +30,15 @@ export default function ExamplesPage() {
         .then(({ data }) => { if (data) setRole(data.role) })
     })
 
-    // 초기 코드 세팅
     if (content) {
-      const initial: Record<number, string> = {}
-      content?.examples.forEach((ex, i) => { initial[i] = ex.code })
-      setCodes(initial)
+      const initialCodes: Record<number, string> = {}
+      const initialInputs: Record<number, string[]> = {}
+      content.examples.forEach((ex, i) => {
+        initialCodes[i] = ex.code
+        initialInputs[i] = ex.defaultInputs ? [...ex.defaultInputs] : []
+      })
+      setCodes(initialCodes)
+      setInputValues(initialInputs)
     }
 
     const s1 = document.createElement('script')
@@ -53,13 +56,14 @@ export default function ExamplesPage() {
     <div className="flex items-center justify-center py-20 text-gray-400">단원을 찾을 수 없어요</div>
   )
 
-  // 실제로 코드를 실행하는 함수
   async function runCode(index: number) {
     if (!pyReady) return
     setRunning(index)
     const Sk = window.Sk
     let out = ''
     const code = codes[index] ?? (content?.examples[index]?.code || '')
+    const inputs = inputValues[index] || []
+    let inputIdx = 0
 
     Sk.configure({
       output: (t: string) => { out += t },
@@ -67,6 +71,8 @@ export default function ExamplesPage() {
         if (!Sk.builtinFiles?.files?.[x]) throw 'File not found: ' + x
         return Sk.builtinFiles.files[x]
       },
+      inputfun: () => inputs[inputIdx++] ?? '',
+      inputfunTakesPrompt: true,
       __future__: Sk.python3,
       execLimit: 5000
     })
@@ -85,6 +91,7 @@ export default function ExamplesPage() {
 
   function resetCode(index: number) {
     setCodes(prev => ({ ...prev, [index]: content?.examples[index]?.code || '' }))
+    setInputValues(prev => ({ ...prev, [index]: content?.examples[index]?.defaultInputs ? [...(content.examples[index].defaultInputs!)] : [] }))
     setOutputs(prev => { const next = {...prev}; delete next[index]; return next })
   }
 
@@ -104,21 +111,15 @@ export default function ExamplesPage() {
             <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-gray-400">{pyReady ? '🟢 실행 준비됨' : '⏳ 로딩 중...'}</div>
-          {role === 'teacher' && (
-            <button onClick={() => setEditMode(!editMode)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${editMode ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-600'}`}>
-              {editMode ? '✏️ 편집 중' : '✏️ 교사 편집'}
-            </button>
-          )}
-        </div>
+        <div className="text-xs text-gray-400">{pyReady ? '🟢 실행 준비됨' : '⏳ 로딩 중...'}</div>
       </div>
 
-      {content?.examples.map((example, i) => {
+      {content.examples.map((example, i) => {
         const currentCode = codes[i] ?? example.code
         const output = outputs[i]
         const isModified = currentCode !== example.code
+        const hasInputs = example.defaultInputs && example.defaultInputs.length > 0
+        const currentInputs = inputValues[i] || []
 
         return (
           <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -158,22 +159,39 @@ export default function ExamplesPage() {
                   </div>
                 </div>
 
-                {/* 교사 편집 모드 OR 학생 편집 가능 textarea */}
-                {(editMode || true) ? (
-                  <textarea
-                    value={currentCode}
-                    onChange={e => setCodes(prev => ({ ...prev, [i]: e.target.value }))}
-                    rows={Math.max(currentCode.split('\n').length + 1, 5)}
-                    spellCheck={false}
-                    className="w-full bg-gray-950 text-green-400 font-mono text-sm px-4 py-4 outline-none resize-none border-none"
-                    style={{ minHeight: 120 }}
-                  />
-                ) : (
-                  <pre className="bg-gray-950 text-green-400 font-mono text-sm px-4 py-4 overflow-x-auto">
-                    <code>{currentCode}</code>
-                  </pre>
-                )}
+                <textarea
+                  value={currentCode}
+                  onChange={e => setCodes(prev => ({ ...prev, [i]: e.target.value }))}
+                  rows={Math.max(currentCode.split('\n').length + 1, 5)}
+                  spellCheck={false}
+                  className="w-full bg-gray-950 text-green-400 font-mono text-sm px-4 py-4 outline-none resize-none border-none"
+                  style={{ minHeight: 120 }}
+                />
               </div>
+
+              {/* input() 입력값 UI */}
+              {hasInputs && (
+                <div className="bg-sky-50 border border-sky-100 rounded-xl px-4 py-3">
+                  <div className="text-xs font-semibold text-sky-700 mb-2">⌨️ 테스트 입력값 (input() 에 들어가는 값)</div>
+                  <div className="flex flex-wrap gap-2">
+                    {currentInputs.map((val, j) => (
+                      <div key={j} className="flex items-center gap-1">
+                        <span className="text-xs text-sky-400">{j + 1}번째 입력:</span>
+                        <input
+                          value={val}
+                          onChange={e => {
+                            const next = [...currentInputs]
+                            next[j] = e.target.value
+                            setInputValues(prev => ({ ...prev, [i]: next }))
+                          }}
+                          className="text-xs font-mono border border-sky-200 rounded-lg px-2 py-1 outline-none focus:border-sky-400 bg-white w-24"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-sky-400 mt-1.5">값을 바꾸고 실행해보세요!</p>
+                </div>
+              )}
 
               {/* 실행 결과 */}
               {output !== undefined && (
@@ -198,7 +216,6 @@ export default function ExamplesPage() {
                 <p className="text-sm text-amber-700 leading-relaxed">{example.explanation}</p>
               </div>
 
-              {/* 직접 수정 안내 */}
               {!output && (
                 <p className="text-xs text-gray-400 text-center">
                   코드를 직접 수정하고 ▶ 실행을 눌러보세요. 어떻게 바뀌는지 확인해봐요!

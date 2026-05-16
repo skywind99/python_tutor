@@ -11,6 +11,7 @@ export interface UnitContent {
     code: string
     output: string
     explanation: string
+    defaultInputs?: string[]
   }[]
 }
 
@@ -251,7 +252,8 @@ print("안녕하세요!")
 print("저는", name + "이에요.")
 print("나이는", age, "살이고, 10년 후엔", age+10, "살이에요.")`,
         output: "안녕하세요!\n저는 홍길동이에요.\n나이는 17 살이고, 10년 후엔 27 살이에요.",
-        explanation: "input()으로 받은 이름은 그대로, 나이는 int()로 변환해서 계산에 사용했어요."
+        explanation: "input()으로 받은 이름은 그대로, 나이는 int()로 변환해서 계산에 사용했어요.",
+        defaultInputs: ["홍길동", "17"]
       },
       {
         title: "간단한 계산기",
@@ -264,7 +266,8 @@ print(a, "-", b, "=", a - b)
 print(a, "*", b, "=", a * b)
 print(a, "//", b, "=", a // b)`,
         output: "3 + 5 = 8\n3 - 5 = -2\n3 * 5 = 15\n3 // 5 = 0",
-        explanation: "int(input())으로 숫자를 입력받아서 바로 연산할 수 있어요."
+        explanation: "int(input())으로 숫자를 입력받아서 바로 연산할 수 있어요.",
+        defaultInputs: ["3", "5"]
       }
     ]
   },
@@ -516,6 +519,29 @@ print("10 - 4 =", subtract(10, 4))
 print("6 x 7 =", multiply(6, 7))`,
         output: "3 + 5 = 8\n10 - 4 = 6\n6 x 7 = 42",
         explanation: "각 연산을 별도 함수로 만들면 필요할 때마다 호출해서 쓸 수 있어요."
+      },
+      {
+        title: "별점 출력 함수",
+        description: "매개변수와 return을 활용한 함수예요",
+        code: `def make_stars(n):
+    return "★" * n
+
+def grade_label(score):
+    if score >= 90:
+        return "A"
+    elif score >= 80:
+        return "B"
+    elif score >= 70:
+        return "C"
+    else:
+        return "F"
+
+print(make_stars(5))
+print(make_stars(3))
+print("등급:", grade_label(85))
+print("등급:", grade_label(62))`,
+        output: "★★★★★\n★★★\n등급: B\n등급: F",
+        explanation: "함수 안에서 if문을 써서 조건에 따라 다른 값을 return할 수 있어요."
       }
     ]
   },
@@ -578,6 +604,27 @@ print("최저점:", min(scores))
 print("평균:", sum(scores) // len(scores))`,
         output: "성적 목록: [85, 92, 78, 95, 88]\n최고점: 95\n최저점: 78\n평균: 87",
         explanation: "max(), min(), sum()은 리스트를 처리하는 유용한 내장 함수예요."
+      },
+      {
+        title: "장바구니 프로그램",
+        description: "리스트로 장바구니를 만들어봐요",
+        code: `cart = []
+
+cart.append("사과")
+cart.append("우유")
+cart.append("빵")
+cart.append("계란")
+
+print("장바구니:", cart)
+print("총", len(cart), "개 담겨 있어요")
+
+cart.remove("우유")
+print("우유 제거 후:", cart)
+
+for i, item in enumerate(cart):
+    print(str(i+1) + ".", item)`,
+        output: "장바구니: ['사과', '우유', '빵', '계란']\n총 4 개 담겨 있어요\n우유 제거 후: ['사과', '빵', '계란']\n1. 사과\n2. 빵\n3. 계란",
+        explanation: "append()로 추가, remove()로 삭제, enumerate()로 번호와 값을 함께 꺼낼 수 있어요."
       }
     ]
   },
@@ -634,13 +681,34 @@ result = random.randint(1, 6)
 print("주사위:", result)
 
 if result == 6:
-    print("🎉 최고!")
+    print("최고!")
 elif result >= 4:
-    print("👍 좋아!")
+    print("좋아!")
 else:
     print("다시 도전!")`,
-        output: "주사위: 4\n👍 좋아!",
+        output: "주사위: 4\n좋아!",
         explanation: "random.randint(1, 6)으로 1~6 사이 랜덤 숫자를 뽑아요. 매번 실행마다 다른 결과가 나와요."
+      },
+      {
+        title: "문자열 처리 모음",
+        description: "문자열 내장 함수들을 실습해봐요",
+        code: `s = "Hello, Python!"
+
+print("길이:", len(s))
+print("대문자:", s.upper())
+print("소문자:", s.lower())
+print("교체:", s.replace("Python", "파이썬"))
+print("포함?", "Python" in s)
+
+# 문자열 슬라이싱
+print("첫 5글자:", s[:5])
+print("마지막 7글자:", s[-7:])
+
+# 분리
+words = s.split(", ")
+print("분리:", words)`,
+        output: "길이: 14\n대문자: HELLO, PYTHON!\n소문자: hello, python!\n교체: Hello, 파이썬!\n포함? True\n첫 5글자: Hello\n마지막 7글자: Python!\n분리: ['Hello', 'Python!']",
+        explanation: "upper(), lower(), replace(), split() 등 문자열 메서드는 원본을 바꾸지 않고 새 문자열을 반환해요."
       }
     ]
   }
