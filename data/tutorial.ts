@@ -275,19 +275,19 @@ playlist = ["Supernova", "Love wins all", "Ditto"]
       },
       {
         id: 3,
-        type: 'fillblank',
+        type: 'multiblank',
         questTitle: '퀘스트 4-3. 자동 재생 시작!',
-        vibeText: '마지막 관문! 기차에서 꺼낸 노래를 하나씩 출력할 차례예요. f-string 안에 꺼낸 노래가 담긴 변수를 넣으면 자동 재생 시스템 완성!',
+        vibeText: '마지막 관문! for문에서 꺼낸 노래를 담을 변수 이름을 직접 정하고, print 안에서도 그 이름을 똑같이 사용해야 해요. 두 빈칸에 같은 이름이 들어간다는 게 핵심!',
         context: '출력 목표:\n🎵 지금 재생 중인 곡: Supernova\n🎵 지금 재생 중인 곡: Love wins all\n🎵 지금 재생 중인 곡: Ditto',
         codeTemplate: `playlist = ["Supernova", "Love wins all", "Ditto"]
 
-for song in playlist:
-    # Tab 키로 들여쓰기!
-    print(f"🎵 지금 재생 중인 곡: {[___]}")`,
-        blanks: ['song'],
-        blankLabels: ['꺼낸 노래가 담긴 변수'],
-        hint: '💡 for문에서 꺼낸 각 노래는 song 변수에 담겨요!',
-        answer: ['song'],
+# playlist에서 하나씩 꺼내 변수에 담아 반복!
+for [___1___] in playlist:
+    print("🎵 지금 재생 중인 곡:", [___2___])`,
+        blanks: ['song', 'song'],
+        blankLabels: ['꺼낸 노래를 담을 변수 이름 정하기', 'for에서 정한 변수 이름 그대로'],
+        hint: '💡 for 옆에 쓴 변수 이름과 print 안의 변수 이름이 완전히 같아야 해요! song, music, track 어떤 이름도 OK',
+        answer: ['song', 'song'],
         successMsg: '🎊 만세!! 점심시간 자동 재생 시스템 구축 완료! 최종 경험치 +500! 당신은 진정한 마스터 PD입니다!',
         xp: 500,
       },
