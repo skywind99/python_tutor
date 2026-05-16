@@ -138,7 +138,7 @@ export default function ExamplesPage() {
   const maxXP = (content?.examples.length ?? 0) * XP_PER_EXAMPLE
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50">
       <style>{`
         @keyframes xpFloat {
           0%   { opacity: 0; transform: translateY(0)   scale(0.8); }
@@ -159,12 +159,12 @@ export default function ExamplesPage() {
       )}
 
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
-            <Link href="/learn" className="hover:text-gray-600">단원 목록</Link>
-            <span>›</span>
-            <span>단원 {unitId}: {unit.title}</span>
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
+        <div className="px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/learn" className="text-gray-400 hover:text-gray-600 text-sm">← 단원 목록</Link>
+            <span className="text-gray-200">|</span>
+            <span className="font-semibold text-gray-900 text-sm">단원 {unitId}: {unit.title}</span>
           </div>
           <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
             <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
@@ -174,17 +174,9 @@ export default function ExamplesPage() {
             <Link href={`/learn/${unitId}/custom-missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✨ 추가</Link>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-            totalXP > 0 ? 'bg-teal-50 text-teal-700' : 'bg-gray-50 text-gray-300'
-          }`}>
-            💎 {totalXP}/{maxXP} XP
-          </div>
-          <div className="text-xs text-gray-400">{pyReady ? '🟢 실행 준비됨' : '⏳ 로딩 중...'}</div>
-        </div>
       </div>
 
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* 예제 목록 */}
       {content.examples.map((example, i) => {
         const currentCode = codes[i] ?? example.code
@@ -306,6 +298,7 @@ export default function ExamplesPage() {
         className="flex items-center justify-center gap-2 py-4 bg-blue-600 text-white font-semibold rounded-2xl hover:bg-blue-700 transition-colors">
         빈칸 채우기 연습하기 ✏️
       </Link>
+    </div>
     </div>
   )
 }

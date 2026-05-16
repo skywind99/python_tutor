@@ -173,30 +173,23 @@ export default function GuidedPage() {
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 + 탭 */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/learn" className="text-gray-400 hover:text-gray-600 text-sm">← 단원 목록</Link>
             <span className="text-gray-200">|</span>
             <span className="font-semibold text-gray-900 text-sm">단원 {unitId}: {unit.title}</span>
           </div>
-          <div className="flex items-center gap-3">
-            {earnedXP > 0 && (
-              <span className="text-xs bg-teal-50 text-teal-700 px-2.5 py-1 rounded-full font-semibold">
-                💎 {earnedXP} XP 획득
-              </span>
-            )}
-            <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
-              <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
-              <Link href={`/learn/${unitId}/examples`} className="px-3 py-2 text-gray-400 hover:text-gray-600">💻 예제</Link>
-              <span className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">✏️ 연습</span>
-              <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
-              <Link href={`/learn/${unitId}/custom-missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✨ 추가</Link>
-            </div>
+          <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
+            <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
+            <Link href={`/learn/${unitId}/examples`} className="px-3 py-2 text-gray-400 hover:text-gray-600">💻 예제</Link>
+            <span className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">✏️ 연습</span>
+            <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
+            <Link href={`/learn/${unitId}/custom-missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✨ 추가</Link>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-6 space-y-4">
+      <div className="max-w-4xl mx-auto p-6 space-y-4">
         {/* 진행도 */}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">

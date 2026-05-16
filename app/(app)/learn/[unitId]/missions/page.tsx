@@ -99,8 +99,7 @@ export default function MissionsPage() {
       try {
         const cmRes = await fetch('/api/custom-missions')
         const cmData = await cmRes.json()
-        const unitCustom = (cmData.missions || []).filter((m: any) => m.unit_id === unitId)
-        setCustomMissions(unitCustom)
+        setCustomMissions(cmData.missions || [])
       } catch { /* ignore */ }
       try {
         const res = await fetch('/api/progress')
