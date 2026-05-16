@@ -293,6 +293,7 @@ export default function MissionsPage() {
           <div className="flex gap-1 mt-2">
             <Link href={`/learn/${unitId}/concept`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>📖</Link>
             <Link href={`/learn/${unitId}/examples`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>💻</Link>
+            <Link href={`/learn/${unitId}/guided`} className="text-xs px-2 py-1 rounded-lg transition-colors" style={{background:'rgba(255,255,255,0.05)',color:'#8b949e'}}>✏️</Link>
             <span className="text-xs px-2 py-1 rounded-lg font-medium" style={{background:'rgba(249,115,22,0.15)',color:'#fb923c'}}>🎯</span>
           </div>
         </div>

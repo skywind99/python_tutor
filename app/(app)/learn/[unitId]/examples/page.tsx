@@ -108,6 +108,7 @@ export default function ExamplesPage() {
           <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
             <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 text-gray-400 hover:text-gray-600">📖 개념</Link>
             <span className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">💻 예제</span>
+            <Link href={`/learn/${unitId}/guided`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✏️ 연습</Link>
             <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
           </div>
         </div>
@@ -226,9 +227,9 @@ export default function ExamplesPage() {
         )
       })}
 
-      <Link href={`/learn/${unitId}/missions`}
-        className="flex items-center justify-center gap-2 py-4 bg-orange-500 text-white font-semibold rounded-2xl hover:bg-orange-600 transition-colors">
-        미션 풀러 가기 🎯
+      <Link href={`/learn/${unitId}/guided`}
+        className="flex items-center justify-center gap-2 py-4 bg-blue-600 text-white font-semibold rounded-2xl hover:bg-blue-700 transition-colors">
+        빈칸 채우기 연습하기 ✏️
       </Link>
     </div>
   )

@@ -19,7 +19,7 @@ export default function LearnPage() {
     <div className="max-w-2xl mx-auto p-6">
       <div className="mb-5">
         <h1 className="text-lg font-bold text-gray-900">단원별 학습</h1>
-        <p className="text-sm text-gray-400 mt-0.5">개념 → 예제 → 미션 순서로 학습해요</p>
+        <p className="text-sm text-gray-400 mt-0.5">개념 → 예제 → 연습 → 미션 순서로 학습해요</p>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -47,7 +47,7 @@ export default function LearnPage() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 <Link href={`/learn/${unit.id}/concept`}
                   className="text-center py-3 rounded-xl bg-teal-50 hover:bg-teal-100 text-sm font-semibold text-teal-700 transition-colors">
                   📖 개념
@@ -55,6 +55,10 @@ export default function LearnPage() {
                 <Link href={`/learn/${unit.id}/examples`}
                   className="text-center py-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-sm font-semibold text-blue-700 transition-colors">
                   💻 예제
+                </Link>
+                <Link href={`/learn/${unit.id}/guided`}
+                  className="text-center py-3 rounded-xl bg-purple-50 hover:bg-purple-100 text-sm font-semibold text-purple-700 transition-colors">
+                  ✏️ 연습
                 </Link>
                 <Link href={`/learn/${unit.id}/missions`}
                   className="text-center py-3 rounded-xl bg-orange-50 hover:bg-orange-100 text-sm font-semibold text-orange-700 transition-colors">
@@ -66,7 +70,7 @@ export default function LearnPage() {
                       ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
                       : 'bg-gray-50 hover:bg-gray-100 text-gray-400'
                   }`}>
-                  ✨ 추가문제{customCount > 0 ? ` (${customCount})` : ''}
+                  ✨ 추가
                 </Link>
               </div>
             </div>

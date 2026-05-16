@@ -55,6 +55,7 @@ export default function ConceptPage() {
             <div className="flex rounded-xl overflow-hidden border border-gray-100 bg-gray-50 text-xs">
               <Link href={`/learn/${unitId}/concept`} className="px-3 py-2 bg-white text-gray-900 shadow-sm font-medium">📖 개념</Link>
               <Link href={`/learn/${unitId}/examples`} className="px-3 py-2 text-gray-400 hover:text-gray-600">💻 예제</Link>
+              <Link href={`/learn/${unitId}/guided`} className="px-3 py-2 text-gray-400 hover:text-gray-600">✏️ 연습</Link>
               <Link href={`/learn/${unitId}/missions`} className="px-3 py-2 text-gray-400 hover:text-gray-600">🎯 미션</Link>
             </div>
           </div>
