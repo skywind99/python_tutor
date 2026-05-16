@@ -7,7 +7,10 @@ import type { Mission } from '@/data/missions'
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 
-const Lottie = dynamic(() => import('lottie-react'), { ssr: false })
+const DotLottie = dynamic(
+  () => import('@lottiefiles/dotlottie-react').then(m => ({ default: m.DotLottieReact })),
+  { ssr: false }
+)
 
 declare global { interface Window { Sk: any } }
 
@@ -70,11 +73,8 @@ export default function MissionsPage() {
   const [userId, setUserId] = useState<string|null>(null)
   const gemIdRef = useRef(0)
 
-  // Lottie animation data
-  const [successAnim, setSuccessAnim] = useState<any>(null)
-  const [hintAnim, setHintAnim] = useState<any>(null)
   const [showSuccessLottie, setShowSuccessLottie] = useState(false)
-  const [showHintLottie, setShowHintLottie] = useState(false)
+  const [showErrorLottie, setShowErrorLottie] = useState(false)
 
   useEffect(() => {
     const s1 = document.createElement('script')
@@ -87,8 +87,6 @@ export default function MissionsPage() {
     }
     document.head.appendChild(s1)
 
-    // 성공 애니메이션 미리 로드
-    fetch('/lottie/success.json').then(r => r.json()).then(setSuccessAnim).catch(() => {})
 
     async function loadUserProgress() {
       const sb = getClient()
@@ -157,6 +155,7 @@ export default function MissionsPage() {
       const allPassed = results.every(r => r.passed)
       setOutputOk(allPassed)
       if (allPassed && !passed[current.id]) await onPass(results[0].actual)
+      else if (!allPassed) { setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200) }
       setRunning(false)
       return
     }
@@ -183,11 +182,13 @@ export default function MissionsPage() {
           const wi = exp.findIndex((l,i)=>l!==act[i])
           if(wi>=0) setDiffMsg(`${wi+1}번째 줄 → 예상: "${exp[wi]}" / 출력: "${act[wi]||'없음'}"`)
         }
+        setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
       } else if (!passed[current.id]) {
         await onPass(actual)
       }
     } catch (e: any) {
       setOutput(String(e).replace(/^.*?Error:/,'오류:')); setOutputOk(false)
+      setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
     }
     setRunning(false)
   }
@@ -209,10 +210,8 @@ export default function MissionsPage() {
     setScorePopup({ text: `+${s}` })
     setTimeout(() => setScorePopup(null), 1500)
 
-    // Lottie 성공 애니메이션
-    if (successAnim) {
-      setShowSuccessLottie(true)
-    }
+    setShowSuccessLottie(true)
+    setTimeout(() => setShowSuccessLottie(false), 3500)
 
     for (let i=0; i<gemN; i++) {
       setTimeout(() => {
@@ -241,17 +240,6 @@ export default function MissionsPage() {
     setChatInput('')
     setTimeout(scrollToBottom, 50)
 
-    // Lottie 힌트 애니메이션 (첫 요청 시 lazy load)
-    if (!hintAnim) {
-      fetch('/lottie/hint.json').then(r => r.json()).then(data => {
-        setHintAnim(data)
-        setShowHintLottie(true)
-        setTimeout(() => setShowHintLottie(false), 2200)
-      }).catch(() => {})
-    } else {
-      setShowHintLottie(true)
-      setTimeout(() => setShowHintLottie(false), 2200)
-    }
 
     try {
       const res = await fetch('/api/hint', {
@@ -371,20 +359,18 @@ export default function MissionsPage() {
           {/* AI 튜터 채팅 */}
           <div className="flex flex-col overflow-hidden" style={{flex:'4 1 0%',minHeight:0,background:'#f9fafb'}}>
             {/* 채팅 헤더 */}
-            <div className="flex items-center gap-2 px-4 py-2.5 flex-shrink-0 relative" style={{background:'white',borderBottom:'1px solid #e5e7eb'}}>
-              <span className="text-base">🤖</span>
-              <span className="text-xs font-semibold text-gray-700">AI 튜터</span>
-              {hintCount > 0 && (
-                <span className="text-xs ml-1" style={{color:'#9ca3af'}}>힌트 {hintCount}회 사용</span>
-              )}
+            <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{background:'white',borderBottom:'1px solid #e5e7eb'}}>
+              <div style={{width:36,height:36,flexShrink:0}}>
+                <DotLottie src="/lottie/animation/Live chatbot.lottie" loop autoplay />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-gray-700">AI 튜터</div>
+                {hintCount > 0 && (
+                  <div className="text-xs" style={{color:'#9ca3af'}}>힌트 {hintCount}회 사용</div>
+                )}
+              </div>
               {hintLoading && (
-                <span className="text-xs ml-auto animate-pulse" style={{color:'#6366f1'}}>생각 중...</span>
-              )}
-              {/* 힌트 Lottie - 헤더 위에 팝업 */}
-              {showHintLottie && hintAnim && (
-                <div className="absolute right-3 -top-16 z-20 pointer-events-none" style={{width:64,height:64}}>
-                  <Lottie animationData={hintAnim} loop={false} />
-                </div>
+                <span className="text-xs animate-pulse" style={{color:'#6366f1'}}>생각 중...</span>
               )}
             </div>
 
@@ -424,7 +410,10 @@ export default function MissionsPage() {
             </div>
 
             {/* 입력창 */}
-            <div className="p-2 flex gap-1.5 flex-shrink-0" style={{background:'white',borderTop:'1px solid #e5e7eb'}}>
+            <div className="p-2 flex gap-1.5 flex-shrink-0 items-center" style={{background:'white',borderTop:'1px solid #e5e7eb'}}>
+              <div style={{width:28,height:28,flexShrink:0}}>
+                <DotLottie src="/lottie/animation/Flirting Dog.lottie" loop autoplay />
+              </div>
               <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
                 className="px-2.5 py-2 text-xs rounded-lg border transition-colors disabled:opacity-40 whitespace-nowrap font-medium"
                 style={{borderColor:'#e5e7eb',color:'#374151'}}>
@@ -492,6 +481,11 @@ export default function MissionsPage() {
               )}
               {outputOk === false && (
                 <span className="text-xs font-bold" style={{color:'#f85149'}}>✗ 아직 아니에요</span>
+              )}
+              {showErrorLottie && (
+                <div className="ml-auto" style={{width:40,height:40}}>
+                  <DotLottie src="/lottie/animation/Cat Crying emojiSticker animation.lottie" loop autoplay />
+                </div>
               )}
             </div>
 
@@ -605,18 +599,17 @@ export default function MissionsPage() {
         </div>
       </div>
 
-      {/* ── Lottie 성공 오버레이 ── */}
-      {showSuccessLottie && successAnim && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
-          style={{background:'rgba(0,0,0,0.25)'}}
-        >
-          <div style={{width:340,height:340}}>
-            <Lottie
-              animationData={successAnim}
-              loop={false}
-              onComplete={() => setShowSuccessLottie(false)}
-            />
+      {/* ── 성공 오버레이: Confetti 배경 + 점핑 캐릭터 ── */}
+      {showSuccessLottie && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{background:'rgba(0,0,0,0.25)'}}>
+          {/* 폭죽 배경 */}
+          <div className="absolute inset-0">
+            <DotLottie src="/lottie/animation/Confetti.lottie" loop autoplay />
+          </div>
+          {/* 점핑 캐릭터 */}
+          <div className="relative z-10" style={{width:320,height:320}}>
+            <DotLottie src="/lottie/animation/Cute Mascot Jumping Character.lottie" loop={false} autoplay />
           </div>
         </div>
       )}
