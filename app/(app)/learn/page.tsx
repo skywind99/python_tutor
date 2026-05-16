@@ -17,8 +17,11 @@ export default function LearnPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-5">
-        <h1 className="text-lg font-bold text-gray-900">단원별 학습</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">📚 단원별 학습</h1>
+          <p className="text-sm text-gray-400 mt-0.5">개념 · 예제 · 연습 · 미션 순서로 학습해요</p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
