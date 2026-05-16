@@ -323,27 +323,32 @@ export default function ProfilePage() {
               <p className="text-xs text-red-500">{quota.error}</p>
             )}
             {quota?.groq && (
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  {
-                    label: 'Groq 요청 잔여',
-                    value: quota.groq.remainingRequests >= 0 ? quota.groq.remainingRequests.toLocaleString() : '-',
-                    total: quota.groq.limitRequests >= 0 ? quota.groq.limitRequests : null,
-                  },
-                  {
-                    label: 'Groq 토큰 잔여',
-                    value: quota.groq.remainingTokens >= 0 ? quota.groq.remainingTokens.toLocaleString() : '-',
-                    total: quota.groq.limitTokens >= 0 ? quota.groq.limitTokens : null,
-                  },
-                ].map(item => (
-                  <div key={item.label} className="bg-orange-50 rounded-xl p-3">
-                    <div className="text-xs text-orange-500 mb-1">{item.label}</div>
-                    <div className="text-lg font-bold text-orange-700">{item.value}</div>
-                    {item.total != null && (
-                      <div className="text-xs text-orange-400">/ {item.total.toLocaleString()}</div>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    {
+                      label: 'Groq 요청 잔여',
+                      value: quota.groq.remainingRequests >= 0 ? quota.groq.remainingRequests.toLocaleString() : '-',
+                      total: quota.groq.limitRequests >= 0 ? quota.groq.limitRequests : null,
+                    },
+                    {
+                      label: 'Groq 토큰 잔여',
+                      value: quota.groq.remainingTokens >= 0 ? quota.groq.remainingTokens.toLocaleString() : '-',
+                      total: quota.groq.limitTokens >= 0 ? quota.groq.limitTokens : null,
+                    },
+                  ].map(item => (
+                    <div key={item.label} className="bg-orange-50 rounded-xl p-3">
+                      <div className="text-xs text-orange-500 mb-1">{item.label}</div>
+                      <div className="text-lg font-bold text-orange-700">{item.value}</div>
+                      {item.total != null && (
+                        <div className="text-xs text-orange-400">/ {item.total.toLocaleString()}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">
+                  {quota.fromCache ? '🕐 학생이 AI 힌트를 쓸 때마다 자동 갱신돼요' : '🔄 초기값 조회 완료'}{quota.groq.updatedAt ? ` · 마지막 갱신: ${new Date(quota.groq.updatedAt).toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'})}` : ''}
+                </p>
               </div>
             )}
           </div>
