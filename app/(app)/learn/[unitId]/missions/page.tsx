@@ -484,16 +484,6 @@ export default function MissionsPage() {
                     <pre className="text-xs font-mono whitespace-pre-wrap" style={{color:'#047857'}}>{currentCustom.expected_output}</pre>
                   </div>
                 )}
-                {currentCustom.hints && currentCustom.hints.length > 0 && (
-                  <div className="mt-3 space-y-1">
-                    <div className="text-xs font-semibold mb-1.5" style={{color:'#8b949e'}}>💡 힌트</div>
-                    {currentCustom.hints.map((h: string, i: number) => (
-                      <div key={i} className="text-xs rounded-lg px-2.5 py-2" style={{background:'rgba(139,92,246,0.06)',color:'#6b7280'}}>
-                        {i + 1}. {h}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </>
             ) : (
               <>
