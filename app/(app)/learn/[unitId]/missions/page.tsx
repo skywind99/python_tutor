@@ -72,6 +72,8 @@ export default function MissionsPage() {
   const [role, setRole] = useState('student')
   const [userId, setUserId] = useState<string|null>(null)
   const [customMissions, setCustomMissions] = useState<any[]>([])
+  const [currentCustom, setCurrentCustom] = useState<any | null>(null)
+  const [passedCustom, setPassedCustom] = useState<Record<string, boolean>>({})
   const gemIdRef = useRef(0)
 
   const [showSuccessLottie, setShowSuccessLottie] = useState(false)
@@ -104,6 +106,13 @@ export default function MissionsPage() {
         const cmData = await cmRes.json()
         const all = cmData.missions || []
         setCustomMissions(all.filter((m: any) => Number(m.unit_id) === unitId))
+        const sb2 = getClient()
+        const { data: cmLogs } = await sb2.from('custom_mission_logs').select('custom_mission_id').eq('student_id', user.id).eq('passed', true)
+        if (cmLogs) {
+          const pMap: Record<string, boolean> = {}
+          cmLogs.forEach((l: any) => { pMap[String(l.custom_mission_id)] = true })
+          setPassedCustom(pMap)
+        }
       } catch { /* ignore */ }
       try {
         const res = await fetch('/api/progress')
@@ -129,8 +138,18 @@ export default function MissionsPage() {
   }, [])
 
   const changeMission = (m: Mission) => {
+    setCurrentCustom(null)
     setCurrent(m); setCode(m.template); setOutput(''); setOutputOk(null)
     setDiffMsg(''); setTestResults([]); setChatMessages([]); setChatInput(''); setHintCount(0)
+    setSolutionCode(''); setShowSolution(false)
+  }
+
+  const selectCustomMission = (m: any) => {
+    setCurrentCustom(m)
+    setCode(m.template || '')
+    setOutput(''); setOutputOk(null)
+    setDiffMsg(''); setTestResults([])
+    setChatMessages([]); setChatInput(''); setHintCount(0)
     setSolutionCode(''); setShowSolution(false)
   }
 
@@ -162,10 +181,68 @@ export default function MissionsPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
+  const onPassCustom = async () => {
+    if (!currentCustom) return
+    const s = Math.max(10, 100 - hintCount * 15)
+    if (userId) {
+      try {
+        const sb = getClient()
+        await sb.from('custom_mission_logs').upsert({
+          custom_mission_id: currentCustom.id,
+          student_id: userId,
+          passed: true,
+          code,
+          score: s,
+          hints_used: hintCount,
+        }, { onConflict: 'custom_mission_id,student_id' })
+      } catch (e) { console.error('Custom save failed:', e) }
+      setPassedCustom(p => ({ ...p, [String(currentCustom.id)]: true }))
+    }
+    setShowSuccessLottie(true)
+    setTimeout(() => setShowSuccessLottie(false), 3500)
+    setCelebration('🎉 추가문제 완료!')
+    setTimeout(() => setCelebration(''), 2500)
+  }
+
   const runCode = async () => {
     if (!pyReady || running) return
     setRunning(true)
     const Sk = window.Sk
+
+    if (currentCustom) {
+      const inputs = (currentCustom.default_input || '').split(',').map((s: string) => s.trim())
+      let out = ''; let inputIdx = 0
+      try {
+        Sk.configure({
+          output: (t: string) => { out += t },
+          read: (x: string) => { if (!Sk.builtinFiles?.files?.[x]) throw 'File not found: '+x; return Sk.builtinFiles.files[x] },
+          inputfun: () => inputs[inputIdx++] || '',
+          inputfunTakesPrompt: true, __future__: Sk.python3, execLimit: 5000,
+        })
+        await Sk.misceval.asyncToPromise(() => Sk.importMainWithBody('<stdin>', false, code, true))
+        const actual = out.trim()
+        setOutput(actual)
+        const ok = norm(actual) === norm(currentCustom.expected_output || '')
+        setOutputOk(ok)
+        if (!ok) {
+          const exp = norm(currentCustom.expected_output || '').split('\n')
+          const act = norm(actual).split('\n')
+          if (exp.length !== act.length) setDiffMsg(`줄 수가 달라요 (예상 ${exp.length}줄, 출력 ${act.length}줄)`)
+          else {
+            const wi = exp.findIndex((l, i) => l !== act[i])
+            if (wi >= 0) setDiffMsg(`${wi+1}번째 줄 → 예상: "${exp[wi]}" / 출력: "${act[wi] || '없음'}"`)
+          }
+          setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
+        } else if (!passedCustom[String(currentCustom.id)]) {
+          await onPassCustom()
+        }
+      } catch (e: any) {
+        setOutput(String(e).replace(/^.*?Error:/, '오류:')); setOutputOk(false)
+        setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
+      }
+      setRunning(false)
+      return
+    }
 
     if (current.testCases && current.testCases.length > 0) {
       setTestResults([])
@@ -280,8 +357,8 @@ export default function MissionsPage() {
       const res = await fetch('/api/hint', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          missionTitle: current.title,
-          missionDesc: current.description,
+          missionTitle: currentCustom ? currentCustom.title : current.title,
+          missionDesc: currentCustom ? currentCustom.description : current.description,
           code,
           studentMessage: userMsg,
           chatHistory: chatMessages.map(m => ({ role: m.role, content: m.text })),
@@ -322,7 +399,7 @@ export default function MissionsPage() {
           </div>
         </div>
         {missions.map(m => {
-          const lv = LEVEL_INFO[m.level]; const done = passed[m.id]; const active = current.id===m.id
+          const lv = LEVEL_INFO[m.level]; const done = passed[m.id]; const active = !currentCustom && current.id===m.id
           return (
             <button key={m.id} onClick={() => changeMission(m)}
               className="text-left p-3 transition-colors"
@@ -349,13 +426,24 @@ export default function MissionsPage() {
             <div className="px-3 pt-2 pb-1 text-xs font-semibold" style={{color:'#a78bfa'}}>✨ 추가문제</div>
             {customMissions.map(m => {
               const levelLabel = ['', '기초', '응용', '심화'][m.level] || '응용'
+              const isActive = currentCustom?.id === m.id
+              const isDone = passedCustom[String(m.id)]
               return (
-                <Link key={m.id} href={`/custom-mission/${m.id}`}
-                  className="block text-left p-3 transition-colors hover:opacity-80"
-                  style={{borderBottom:'1px solid #21262d',background:'rgba(139,92,246,0.05)'}}>
-                  <div className="text-xs font-semibold text-white truncate">{m.title}</div>
-                  <div className="text-xs mt-0.5" style={{color:'#a78bfa'}}>{levelLabel} · {m.topic}</div>
-                </Link>
+                <button key={m.id} onClick={() => selectCustomMission(m)}
+                  className="w-full text-left p-3 transition-colors"
+                  style={{
+                    borderBottom:'1px solid #21262d',
+                    background: isActive ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.05)',
+                    borderLeft: isActive ? '2px solid #a78bfa' : '2px solid transparent',
+                  }}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {isDone
+                      ? <span className="text-xs font-bold" style={{color:'#3fb950'}}>✓</span>
+                      : <span className="text-xs" style={{color:'#30363d'}}>○</span>}
+                    <span className="text-xs font-semibold text-white truncate">{m.title}</span>
+                  </div>
+                  <div className="text-xs" style={{color:'#a78bfa'}}>{levelLabel} · {m.topic}</div>
+                </button>
               )
             })}
           </div>
@@ -375,36 +463,72 @@ export default function MissionsPage() {
 
           {/* 문제 설명 */}
           <div className="overflow-y-auto p-5" style={{flex:'3 1 0%',minHeight:0,borderBottom:'1px solid #e5e7eb'}}>
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <span className="font-bold text-gray-900 text-sm">{current.title}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{background:lv.bg,color:lv.text}}>
-                {lv.label}
-              </span>
-              {passed[current.id] && (
-                <span className="text-xs font-semibold ml-auto" style={{color:'#059669'}}>✓ 완료 · {passed[current.id].score}점</span>
-              )}
-            </div>
-            <div className="flex gap-1 flex-wrap mb-4">
-              {current.tags.map(t=>(
-                <span key={t} className="text-xs px-1.5 py-0.5 rounded font-mono" style={{background:'#f3f4f6',color:'#6b7280'}}>{t}</span>
-              ))}
-            </div>
-            <pre className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">{current.description}</pre>
-            {current.testCases && (
-              <div className="mt-4 rounded-xl px-3 py-2.5" style={{background:'#eef2ff',border:'1px solid #c7d2fe'}}>
-                <span className="text-xs font-semibold" style={{color:'#4338ca'}}>🧪 {current.testCases.length}가지 입력으로 자동 검증돼요</span>
-              </div>
-            )}
-            {current.needsInput && !current.testCases && (
-              <div className="mt-4 rounded-xl px-3 py-2.5" style={{background:'#f0fdf4',border:'1px solid #bbf7d0'}}>
-                <div className="text-xs font-semibold mb-1.5" style={{color:'#059669'}}>⌨️ 테스트 입력값</div>
-                <input
-                  className="text-xs font-mono border rounded px-2 py-1 outline-none w-full"
-                  style={{borderColor:'#d1fae5',background:'white'}}
-                  defaultValue={current.defaultInput}
-                  onChange={e=>{(current as any)._testInput=e.target.value}}
-                />
-              </div>
+            {currentCustom ? (
+              <>
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{background:'rgba(139,92,246,0.1)',color:'#7c3aed'}}>✨ 추가문제</span>
+                  <span className="font-bold text-gray-900 text-sm">{currentCustom.title}</span>
+                  {passedCustom[String(currentCustom.id)] && (
+                    <span className="text-xs font-semibold ml-auto" style={{color:'#059669'}}>✓ 완료!</span>
+                  )}
+                </div>
+                {currentCustom.topic && (
+                  <div className="flex gap-1 flex-wrap mb-3">
+                    <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{background:'#f3f4f6',color:'#6b7280'}}>{currentCustom.topic}</span>
+                  </div>
+                )}
+                <pre className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">{currentCustom.description}</pre>
+                {currentCustom.expected_output && (
+                  <div className="mt-4 rounded-xl px-3 py-2.5" style={{background:'#f0fdf4',border:'1px solid #bbf7d0'}}>
+                    <div className="text-xs font-semibold mb-1" style={{color:'#059669'}}>📋 예상 출력</div>
+                    <pre className="text-xs font-mono whitespace-pre-wrap" style={{color:'#047857'}}>{currentCustom.expected_output}</pre>
+                  </div>
+                )}
+                {currentCustom.hints && currentCustom.hints.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    <div className="text-xs font-semibold mb-1.5" style={{color:'#8b949e'}}>💡 힌트</div>
+                    {currentCustom.hints.map((h: string, i: number) => (
+                      <div key={i} className="text-xs rounded-lg px-2.5 py-2" style={{background:'rgba(139,92,246,0.06)',color:'#6b7280'}}>
+                        {i + 1}. {h}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="font-bold text-gray-900 text-sm">{current.title}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{background:lv.bg,color:lv.text}}>
+                    {lv.label}
+                  </span>
+                  {passed[current.id] && (
+                    <span className="text-xs font-semibold ml-auto" style={{color:'#059669'}}>✓ 완료 · {passed[current.id].score}점</span>
+                  )}
+                </div>
+                <div className="flex gap-1 flex-wrap mb-4">
+                  {current.tags.map(t=>(
+                    <span key={t} className="text-xs px-1.5 py-0.5 rounded font-mono" style={{background:'#f3f4f6',color:'#6b7280'}}>{t}</span>
+                  ))}
+                </div>
+                <pre className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-sans">{current.description}</pre>
+                {current.testCases && (
+                  <div className="mt-4 rounded-xl px-3 py-2.5" style={{background:'#eef2ff',border:'1px solid #c7d2fe'}}>
+                    <span className="text-xs font-semibold" style={{color:'#4338ca'}}>🧪 {current.testCases.length}가지 입력으로 자동 검증돼요</span>
+                  </div>
+                )}
+                {current.needsInput && !current.testCases && (
+                  <div className="mt-4 rounded-xl px-3 py-2.5" style={{background:'#f0fdf4',border:'1px solid #bbf7d0'}}>
+                    <div className="text-xs font-semibold mb-1.5" style={{color:'#059669'}}>⌨️ 테스트 입력값</div>
+                    <input
+                      className="text-xs font-mono border rounded px-2 py-1 outline-none w-full"
+                      style={{borderColor:'#d1fae5',background:'white'}}
+                      defaultValue={current.defaultInput}
+                      onChange={e=>{(current as any)._testInput=e.target.value}}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -538,7 +662,7 @@ export default function MissionsPage() {
                   <DotLottie src="/lottie/animation/Cat Crying emojiSticker animation.lottie" loop autoplay />
                 </div>
               )}
-              {role === 'teacher' && (
+              {role === 'teacher' && !currentCustom && (
                 <button onClick={fetchSolution} disabled={solutionLoading}
                   className="ml-auto text-xs px-3 py-1 rounded-lg font-medium transition-all disabled:opacity-40"
                   style={{background: showSolution ? 'rgba(31,111,235,0.3)' : 'rgba(255,255,255,0.07)', color: showSolution ? '#58a6ff' : '#8b949e'}}>
