@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { UNITS } from '@/data/missions'
 import { UNIT_CONTENTS } from '@/data/content'
 import { createBrowserClient } from '@supabase/ssr'
+import TutorialBanner from '@/app/components/TutorialBanner'
 
 function getClient() {
   return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -64,6 +65,7 @@ export default function ConceptPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-5">
+        <TutorialBanner unitId={unitId} />
         <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
           <div className="flex items-start gap-3">
             <span className="text-2xl">💡</span>

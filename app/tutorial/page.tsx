@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { TUTORIAL_MISSIONS, TUTORIAL_PARTS, type Mission, type TutorialPage } from '@/data/tutorial'
 
@@ -187,9 +188,14 @@ function FillBlankPage({ page, onPass }: { page: TutorialPage; onPass: () => voi
 }
 
 // ── 메인 컴포넌트 ──────────────────────────
-export default function TutorialPage() {
+function TutorialPageInner() {
+  const searchParams = useSearchParams()
   const [screen, setScreen] = useState<Screen>('map')
-  const [selectedPart, setSelectedPart] = useState(1)
+  const [selectedPart, setSelectedPart] = useState(() => {
+    const p = searchParams.get('part')
+    const n = p ? parseInt(p) : 1
+    return (n >= 1 && n <= 4) ? n : 1
+  })
   const [currentMission, setCurrentMission] = useState<Mission | null>(null)
   const [pageIdx, setPageIdx] = useState(0)
   const [completedPages, setCompletedPages] = useState<Set<string>>(new Set())
@@ -546,4 +552,12 @@ export default function TutorialPage() {
   }
 
   return null
+}
+
+export default function TutorialPage() {
+  return (
+    <Suspense>
+      <TutorialPageInner />
+    </Suspense>
+  )
 }
