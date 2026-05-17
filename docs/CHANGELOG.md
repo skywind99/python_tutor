@@ -4,6 +4,28 @@
 
 ---
 
+## [미출시] - 2026-05-17 (현재 작업)
+
+### Added
+- **PART-단원 연결** (`app/components/TutorialBanner.tsx`, `app/(app)/learn/page.tsx`, `app/tutorial/page.tsx`)
+  - 단원 목록을 PART별로 그룹화 (PART 1~4 헤더 + "튜토리얼 보기" 링크)
+  - 개념 페이지 진입 시 해당 PART 튜토리얼 추천 배너 표시 (× 닫기, localStorage 유지)
+  - `/tutorial?part=X` URL 파라미터로 특정 PART 직접 진입 지원
+
+### Changed
+- **튜토리얼 PART 완료 흐름** (`app/tutorial/page.tsx`)
+  - PART 마지막 미션 완료 시 "지도보기"/"다음 미션" 제거
+  - "단원 X 학습 시작하기 →" 버튼으로 개념 페이지 직접 이동
+  - PART 내 미션 간 이동은 기존 "다음 미션 시작!" 유지
+- **추가문제를 미션 화면에 통합** (`app/(app)/learn/[unitId]/missions/page.tsx`)
+  - 사이드바 추가문제 클릭 시 별도 페이지 이동 없이 같은 화면에서 전환
+  - 왼쪽 패널에 추가문제 설명/예상 출력 표시, AI 튜터도 해당 문제 컨텍스트로 힌트 제공
+  - 완료 시 `custom_mission_logs` 저장 및 ✓ 표시, 정적 힌트 직접 표시 제거
+- **대시보드** (`app/(app)/dashboard/page.tsx`)
+  - "선생님 추가 문제" 섹션 제거 (단원별 학습 → ✨추가 탭에서 접근)
+
+---
+
 ## [미출시] - 2026-05-16 (현재 작업)
 
 ### Added

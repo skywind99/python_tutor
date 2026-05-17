@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-05-17 (Day 6)
+
+### PART-단원 연결 `d9e9f89`
+- **배경**: 튜토리얼과 단원 학습이 서로 분리되어 학습 흐름이 끊김
+- **구현**:
+  - `TutorialBanner` 컴포넌트: 개념 페이지 진입 시 해당 PART 튜토리얼 추천 배너 표시
+  - localStorage로 닫기 상태 저장 (PART별 독립)
+  - `learn/page.tsx`: PART별 헤더 + "튜토리얼 보기" 링크로 단원 그룹화
+  - `tutorial/page.tsx`: `useSearchParams`로 `?part=X` URL 파라미터 지원, Suspense 경계 추가
+- **학습 흐름 설계**: 튜토리얼 PART → 개념/예제/연습 → 미션 → 추가문제 → 다음 PART 튜토리얼
+
+### 튜토리얼 완료 후 학습 창 연결 `d32ef00`
+- **변경**: PART 마지막 미션 완료 시 기존 "지도보기"/"다음 미션" 제거
+- 대신 "📚 단원 X 학습 시작하기 →" 버튼 → `/learn/{firstUnitId}/concept` 직접 이동
+- PART 내 중간 미션 완료는 "다음 미션 시작!" 유지
+- **결정 기록**: "지도보기"는 PART 완료 시점에 불필요 — 학습 흐름상 다음 단계로 바로 이동하는 게 자연스럽다고 판단
+
+### 추가문제 미션 화면 통합 `b3949d9` `b2287f5`
+- **배경**: 추가문제가 `/custom-mission/[id]` 별도 페이지로 분리되어 화면 전환이 어색함. 미션과 UI가 사실상 동일함
+- **구현**:
+  - 사이드바 추가문제 항목을 `<Link>` → `<button onClick={selectCustomMission}>` 으로 변경
+  - `currentCustom` 상태로 현재 활성 추가문제 추적
+  - `runCode`: `currentCustom` 감지 시 `expected_output` 비교 방식으로 분기
+  - `onPassCustom`: `custom_mission_logs`에 upsert, 완료 체크 업데이트
+  - 좌측 패널: 추가문제 선택 시 제목/토픽/설명/예상 출력 표시로 조건부 렌더링
+  - `sendChat`: `currentCustom` 여부에 따라 미션 컨텍스트 전환
+  - 정적 힌트 직접 표시 제거 (AI 튜터를 통해서만 힌트 제공)
+- **결정 기록**: `/custom-mission/[id]` 페이지는 유지하되 일반 진입 경로에서 제외
+
+### 대시보드 추가문제 섹션 제거 `d32ef00`
+- 대시보드의 "선생님 추가 문제" 카드 섹션 제거
+- 추가문제는 단원별 학습 페이지 → 미션 탭 사이드바에서 접근
+- `customMissions` 상태 및 `/api/custom-missions` fetch 코드도 함께 제거
+
+---
+
 ## 2026-05-16 (Day 5)
 
 ### 연습 코드 텍스트 색상 버그 수정 `33fb81a`
