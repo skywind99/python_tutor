@@ -17,6 +17,7 @@ export default function ProblemsPage() {
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null)
+  const [selectedCustomMission, setSelectedCustomMission] = useState<any | null>(null)
   const [aiSolution, setAiSolution] = useState<Record<number, string>>({})
   const [aiLoading, setAiLoading] = useState<number | null>(null)
   const [userId, setUserId] = useState('')
@@ -287,7 +288,7 @@ export default function ProblemsPage() {
       {/* 단원 탭 */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
         {UNITS.map(u => (
-          <button key={u.id} onClick={() => { setUnitId(u.id); setSelectedMission(null) }}
+          <button key={u.id} onClick={() => { setUnitId(u.id); setSelectedMission(null); setSelectedCustomMission(null) }}
             className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
               unitId === u.id
                 ? 'text-white shadow-sm'
@@ -310,7 +311,7 @@ export default function ProblemsPage() {
 
             return (
               <div key={mission.id}
-                onClick={() => { setSelectedMission(isSelected ? null : mission); setTab('solutions') }}
+                onClick={() => { setSelectedMission(isSelected ? null : mission); setSelectedCustomMission(null); setTab('solutions') }}
                 className={`bg-white rounded-2xl border p-4 cursor-pointer transition-all ${
                   isSelected ? 'border-indigo-300 shadow-md' : 'border-gray-100 hover:border-gray-200'
                 }`}>
@@ -348,8 +349,11 @@ export default function ProblemsPage() {
               <div className="text-xs font-semibold text-gray-400 mb-2 px-1">✨ 선생님 추가 문제</div>
               {unitCustomMissions.map((m: any) => {
                 const solvers = getCustomMissionSolvers(m.id)
+                const isCustomSelected = selectedCustomMission?.id === m.id
                 return (
-                <div key={m.id} className="bg-white rounded-2xl border border-indigo-100 p-3 mb-2">
+                <div key={m.id}
+                  onClick={() => { setSelectedCustomMission(isCustomSelected ? null : m); setSelectedMission(null) }}
+                  className={`bg-white rounded-2xl border p-3 mb-2 cursor-pointer transition-all ${isCustomSelected ? 'border-indigo-300 shadow-md' : 'border-indigo-100 hover:border-indigo-200'}`}>
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="text-xs px-1.5 py-0.5 rounded-full"
@@ -382,12 +386,12 @@ export default function ProblemsPage() {
                       ))}
                     </select>
                     <button
-                      onClick={() => openEdit(m)}
+                      onClick={e => { e.stopPropagation(); openEdit(m) }}
                       className="text-xs px-2 py-1 rounded-lg bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-colors flex-shrink-0">
                       수정
                     </button>
                     <button
-                      onClick={() => deleteCustomMission(m.id)}
+                      onClick={e => { e.stopPropagation(); deleteCustomMission(m.id) }}
                       disabled={deletingId === m.id}
                       className="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-400 hover:bg-red-100 disabled:opacity-40 transition-colors flex-shrink-0">
                       {deletingId === m.id ? '...' : '삭제'}
@@ -524,7 +528,87 @@ export default function ProblemsPage() {
           </div>
         )}
 
-        {!selectedMission && students.length > 0 && (
+        {selectedCustomMission && (
+          <div className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs px-2 py-0.5 rounded-full"
+                      style={{ background: levelBg(selectedCustomMission.level), color: levelColor(selectedCustomMission.level) }}>
+                      {levelLabel(selectedCustomMission.level)}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-500">✨ 추가문제</span>
+                  </div>
+                  <h2 className="font-bold text-gray-900">{selectedCustomMission.title}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{selectedCustomMission.topic}</p>
+                </div>
+                <button onClick={() => setSelectedCustomMission(null)} className="text-gray-300 hover:text-gray-500 text-xl">×</button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+              {(() => {
+                const solvers = getCustomMissionSolvers(selectedCustomMission.id)
+                const solverIds = new Set(solvers.map((s: any) => s.student_id))
+                const unsolvedStudents = students.filter(s => !solverIds.has(s.id))
+                return (
+                  <>
+                    {solvers.length === 0 ? (
+                      <div className="p-10 text-center text-gray-400">
+                        <div className="text-4xl mb-3">📝</div>
+                        <p className="text-sm">아직 이 문제를 완료한 학생이 없어요</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-50">
+                        {solvers.map((sol: any, i: number) => (
+                          <div key={i} className="p-5">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
+                                  style={{ background: '#4338CA' }}>
+                                  {sol.studentName?.[0] || '?'}
+                                </div>
+                                <div>
+                                  <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-teal-50 text-teal-600">✓ 완료</span>
+                                    <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm font-bold text-gray-900">{sol.score}점</div>
+                              </div>
+                            </div>
+                            {sol.code && (
+                              <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
+                                <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {unsolvedStudents.length > 0 && (
+                      <div className="border-t border-gray-50 p-5">
+                        <div className="text-xs font-semibold text-gray-400 mb-3">미완료 학생 ({unsolvedStudents.length}명)</div>
+                        <div className="flex flex-wrap gap-2">
+                          {unsolvedStudents.map((s: any) => (
+                            <span key={s.id} className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">{s.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        )}
+
+        {!selectedMission && !selectedCustomMission && students.length > 0 && (
           <div className="flex-1 space-y-4">
             <div className="bg-white rounded-2xl border border-gray-100 flex items-center justify-center" style={{ minHeight: '200px' }}>
               <div className="text-center text-gray-400">
