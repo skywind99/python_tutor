@@ -113,23 +113,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── 튜토리얼 배너 ── */}
-      <section className="max-w-3xl mx-auto px-6 -mt-6 relative z-10 mb-6">
-        <Link href="/tutorial"
-          className="block rounded-2xl p-5 text-left transition-all hover:scale-[1.01] hover:shadow-xl shadow-lg"
-          style={{ background: 'linear-gradient(135deg, #302B63 0%, #0F0C29 100%)' }}>
-          <div className="flex items-center gap-4">
-            <div className="text-4xl">🎙️</div>
-            <div className="flex-1">
-              <div className="text-xs text-purple-300 font-semibold mb-0.5">🆕 게임형 튜토리얼</div>
-              <div className="text-white font-bold text-base">슬기로운 방송부 생활</div>
-              <div className="text-white/50 text-xs mt-0.5">파이썬 입문? 여기서 시작해요! 4개 미션 · 1,450 XP</div>
-            </div>
-            <div className="text-white/40 text-2xl">→</div>
-          </div>
-        </Link>
-      </section>
-
       {/* ── 학습 흐름 ── */}
       <section className="max-w-3xl mx-auto px-6 mb-10">
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
