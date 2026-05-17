@@ -116,7 +116,42 @@ function buildUserMessage(
     }
   }
   parts.push(`[학생 질문] ${studentMessage?.trim() || '코드 분석해줘'}`)
+  parts.push(`[언어 규칙 재확인] 반드시 한국어로만 답해. 你, 的, 看, は, が 같은 한자·일본어가 단 하나라도 들어가면 안 돼.`)
   return parts.join('\n\n')
+}
+
+// 중국어(CJK)·일본어(히라가나·가타카나) 포함 여부 감지
+function hasForeignChars(text: string): boolean {
+  return /[一-鿿㐀-䶿぀-ヿ豈-﫿]/.test(text)
+}
+
+async function callGroq(groqKey: string, userMessage: string, retry = false): Promise<{ res: Response; text: string } | null> {
+  const messages = retry
+    ? [
+        { role: 'system', content: SYSTEM_PROMPT + '\n\n절대 명령: 한국어만 사용. 한자·중국어·일본어 완전 금지.' },
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: '알겠어! 한국어로만 답할게.' },
+        { role: 'user', content: '다시 한번 한국어로만 답해줘.' },
+      ]
+    : [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ]
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages,
+      max_tokens: 400,
+      temperature: retry ? 0.3 : 0.7,
+    }),
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  const text = (data.choices?.[0]?.message?.content || '').trim()
+  return { res, text }
 }
 
 export async function POST(req: NextRequest) {
@@ -142,32 +177,28 @@ export async function POST(req: NextRequest) {
 
       // Groq — raw fetch로 rate limit 헤더 캡처
       if (groqKey) {
-        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              { role: 'user', content: userMessage },
-            ],
-            max_tokens: 400,
-            temperature: 0.7,
-          }),
-        })
+        const groqResult = await callGroq(groqKey, userMessage)
+        if (!groqResult) return NextResponse.json({ error: '힌트를 불러오지 못했어요.' }, { status: 500 })
 
-        if (groqRes.status === 429) {
+        if (groqResult.res.status === 429) {
           return NextResponse.json({ error: 'AI 요청 한도 초과. 잠시 후 다시 시도해주세요.' }, { status: 429 })
         }
-        if (!groqRes.ok) {
-          return NextResponse.json({ error: '힌트를 불러오지 못했어요.' }, { status: 500 })
+
+        let { text } = groqResult
+
+        // 한자·일본어 감지 시 1회 재시도
+        if (hasForeignChars(text)) {
+          const retryResult = await callGroq(groqKey, userMessage, true)
+          if (retryResult?.text && !hasForeignChars(retryResult.text)) {
+            text = retryResult.text
+          } else if (retryResult?.text) {
+            // 재시도도 실패 시 한자만 제거
+            text = retryResult.text.replace(/[一-鿿㐀-䶿぀-ヿ豈-﫿]/g, '').trim()
+          }
         }
 
-        const groqData = await groqRes.json()
-        const text = (groqData.choices?.[0]?.message?.content || '').trim()
-
         // 비동기로 quota 저장 (응답 지연 없음)
-        if (teacherId) saveGroqQuota(teacherId, groqRes.headers)
+        if (teacherId) saveGroqQuota(teacherId, groqResult.res.headers)
 
         return NextResponse.json({ hint: text, provider: 'groq' })
       }
