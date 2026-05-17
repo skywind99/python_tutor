@@ -44,17 +44,25 @@ async function saveGroqQuota(teacherId: string, headers: Headers) {
   }).eq('id', teacherId)
 }
 
-const SYSTEM_PROMPT = `너는 한국 고등학생을 위한 친근한 파이썬 AI 튜터야.
+const SYSTEM_PROMPT = `너는 한국 고등학생을 위한 파이썬 AI 튜터야.
 
-[반드시 지켜야 할 규칙]
-- 오직 한국어만 사용해. 한자, 영어, 일본어 절대 금지. 변수명·함수명만 영어 가능.
-- 완성된 코드를 절대 알려주지 마. 스스로 생각하게 유도해.
-- 짧고 명확하게: 3~4문장 이내.
-- 이모지 1~2개만 자연스럽게.
-- 반말로 친근하게 (해요체 아닌 구어체).
-- 마지막엔 생각을 유도하는 질문 하나로 끝내.
-- 코드가 있으면 구체적으로 언급해.
-- 힌트 번호 매기지 마.`
+[언어 규칙 - 최우선]
+- 반드시 한국어만 써. 한자·중국어·일본어는 단 한 글자도 쓰지 마. (예: 这, 的, は, が 같은 문자 절대 금지)
+- 변수명·함수명 같은 코드 식별자만 영어 가능.
+
+[말투]
+- 친근한 구어체 반말. 이모지 1~2개만.
+- 3~4문장 이내로 짧게.
+
+[핵심: 단계적 힌트 - 이전 대화를 보고 판단해]
+- 학생이 처음 묻거나 1번 막힌 경우: 어떤 방향으로 생각해야 하는지만 알려줘. 질문으로 끝내.
+- 학생이 2번 막혔거나 "모르겠다"고 하면: 코드 구조를 구체적으로 알려줘. 핵심 부분만 빈칸으로 힌트 줘도 돼.
+- 학생이 3번 이상 막혔거나 "어디가 틀린거야" 반복하면: 거의 다 알려줘. 마지막 한 줄만 학생이 직접 채우게 해.
+
+[코드 분석 요청 처리]
+- "코드 분석해줘" "뭐가 틀린거야" 등의 요청이 오면, 학생 코드에서 구체적인 문제점을 짚어줘.
+- 이전 대화에서 이미 한 말을 그대로 반복하지 마. 매번 새로운 관점이나 더 구체적인 힌트를 줘야 해.
+- 완성된 정답 코드 전체를 주는 건 금지.`
 
 function buildUserMessage(
   missionTitle: string,
@@ -74,8 +82,19 @@ function buildUserMessage(
   }
   if (errorMsg) parts.push(`[오류 메시지] ${errorMsg}`)
   if (chatHistory.length > 0) {
-    const hist = chatHistory.slice(-6).map(m => `${m.role === 'ai' ? 'AI튜터' : '학생'}: ${m.content}`).join('\n')
+    const hist = chatHistory.slice(-8).map(m => `${m.role === 'ai' ? 'AI튜터' : '학생'}: ${m.content}`).join('\n')
     parts.push(`[이전 대화]\n${hist}`)
+
+    // 학생이 막힌 횟수 감지
+    const stuckKeywords = ['모르겠', '틀린거', '분석해줘', '어떻게', '뭐가']
+    const stuckCount = chatHistory
+      .filter(m => m.role === 'student')
+      .filter(m => stuckKeywords.some(k => m.content.includes(k))).length
+    if (stuckCount >= 3) {
+      parts.push(`[상황] 이 학생은 ${stuckCount}번 막혀 있어. 이번엔 거의 다 알려줘도 돼. 마지막 한 줄만 직접 채우게 해.`)
+    } else if (stuckCount >= 2) {
+      parts.push(`[상황] 이 학생이 ${stuckCount}번 막혔어. 코드 구조를 더 구체적으로 알려줘.`)
+    }
   }
   parts.push(`[학생 질문] ${studentMessage?.trim() || '코드 분석해줘'}`)
   return parts.join('\n\n')
