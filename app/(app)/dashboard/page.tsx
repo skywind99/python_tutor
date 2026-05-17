@@ -14,7 +14,7 @@ function getClient() {
 
 const PLAYER_LEVELS = [
   { level: 1, title: '파이썬 씨앗',   emoji: '🌱', minXP: 0    },
-  { level: 2, title: '파이썬 새싹',   emoji: '🪴', minXP: 100  },
+  { level: 2, title: '파이썬 새싹',   emoji: '🌿', minXP: 100  },
   { level: 3, title: '파이썬 탐험가', emoji: '🔭', minXP: 300  },
   { level: 4, title: '파이썬 개발자', emoji: '💻', minXP: 600  },
   { level: 5, title: '파이썬 마스터', emoji: '⚡', minXP: 1000 },
