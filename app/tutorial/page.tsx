@@ -514,39 +514,51 @@ function TutorialPageInner() {
         </div>
 
         {/* Mission complete modal */}
-        {showComplete && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6">
-            <div className="bg-gray-900 rounded-3xl p-8 max-w-sm w-full text-center border border-yellow-500/30">
-              <div className="text-6xl mb-4">🎉</div>
-              <h2 className="text-2xl font-black text-white mb-2">미션 완료!</h2>
-              <p className="text-white/60 text-sm mb-1">{currentMission.title}</p>
-              <div className="text-yellow-300 font-bold text-lg mb-6">
-                +{currentMission.pages.reduce((s, p) => s + p.xp, 0)} XP 획득!
-              </div>
-              <div className="flex flex-col gap-3">
-                {currentMission.id < TUTORIAL_MISSIONS.length ? (
-                  <button onClick={() => {
-                    const next = TUTORIAL_MISSIONS[currentMission.id]
-                    setShowComplete(false)
-                    startMission(next)
-                  }} className="py-3 rounded-xl font-bold text-white text-sm"
-                    style={{ background: TUTORIAL_MISSIONS[currentMission.id]?.color || '#7C3AED' }}>
-                    다음 미션 시작! →
-                  </button>
-                ) : (
-                  <Link href="/learn" onClick={() => setShowComplete(false)}
-                    className="py-3 rounded-xl font-bold text-gray-900 text-sm bg-yellow-400 hover:bg-yellow-300 transition-colors block">
-                    미션 풀러 가기 🎯
-                  </Link>
-                )}
-                <button onClick={() => { setShowComplete(false); setScreen('map') }}
-                  className="py-2 rounded-xl text-white/50 hover:text-white text-sm transition-colors">
-                  지도로 돌아가기
-                </button>
+        {showComplete && (() => {
+          const curPart = TUTORIAL_PARTS.find(p => p.missionIds.includes(currentMission.id))
+          const nextMission = TUTORIAL_MISSIONS.find(m => m.id === currentMission.id + 1)
+          const nextInSamePart = nextMission && curPart?.missionIds.includes(nextMission.id)
+          const firstUnitId = curPart ? (curPart.part - 1) * 2 + 1 : 1
+          return (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6">
+              <div className="bg-gray-900 rounded-3xl p-8 max-w-sm w-full text-center border border-yellow-500/30">
+                <div className="text-6xl mb-4">{nextInSamePart ? '🎉' : '🏆'}</div>
+                <h2 className="text-2xl font-black text-white mb-2">
+                  {nextInSamePart ? '미션 완료!' : `PART ${curPart?.part} 완료!`}
+                </h2>
+                <p className="text-white/60 text-sm mb-1">{currentMission.title}</p>
+                <div className="text-yellow-300 font-bold text-lg mb-6">
+                  +{currentMission.pages.reduce((s, p) => s + p.xp, 0)} XP 획득!
+                </div>
+                <div className="flex flex-col gap-3">
+                  {nextInSamePart ? (
+                    <>
+                      <button onClick={() => {
+                        setShowComplete(false)
+                        startMission(nextMission!)
+                      }} className="py-3 rounded-xl font-bold text-white text-sm"
+                        style={{ background: nextMission!.color }}>
+                        다음 미션 시작! →
+                      </button>
+                      <button onClick={() => { setShowComplete(false); setScreen('map') }}
+                        className="py-2 rounded-xl text-white/50 hover:text-white text-sm transition-colors">
+                        지도로 돌아가기
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-white/50 text-xs mb-1">이제 단원 학습을 시작해봐요!</p>
+                      <Link href={`/learn/${firstUnitId}/concept`} onClick={() => setShowComplete(false)}
+                        className="py-3 rounded-xl font-bold text-gray-900 text-sm bg-yellow-400 hover:bg-yellow-300 transition-colors block">
+                        📚 단원 {firstUnitId} 학습 시작하기 →
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     )
   }
