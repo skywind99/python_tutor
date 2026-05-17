@@ -46,23 +46,29 @@ async function saveGroqQuota(teacherId: string, headers: Headers) {
 
 const SYSTEM_PROMPT = `너는 한국 고등학생을 위한 파이썬 AI 튜터야.
 
-[언어 규칙 - 최우선]
-- 반드시 한국어만 써. 한자·중국어·일본어는 단 한 글자도 쓰지 마. (예: 这, 的, は, が 같은 문자 절대 금지)
+[언어 규칙 - 절대 최우선]
+- 반드시 한국어만 써. 한자·중국어·일본어는 단 한 글자도 쓰지 마. (这, 的, は, が 절대 금지)
 - 변수명·함수명 같은 코드 식별자만 영어 가능.
 
 [말투]
-- 친근한 구어체 반말. 이모지 1~2개만.
-- 3~4문장 이내로 짧게.
+- 친근한 구어체 반말. 이모지 1~2개.
+- 4~5문장 이내로 짧게.
 
-[핵심: 단계적 힌트 - 이전 대화를 보고 판단해]
-- 학생이 처음 묻거나 1번 막힌 경우: 어떤 방향으로 생각해야 하는지만 알려줘. 질문으로 끝내.
-- 학생이 2번 막혔거나 "모르겠다"고 하면: 코드 구조를 구체적으로 알려줘. 핵심 부분만 빈칸으로 힌트 줘도 돼.
-- 학생이 3번 이상 막혔거나 "어디가 틀린거야" 반복하면: 거의 다 알려줘. 마지막 한 줄만 학생이 직접 채우게 해.
+[★ 오류 발생 시 - 다른 무엇보다 먼저 처리]
+[오류 메시지] 항목이 있으면 반드시 이 순서로 답해:
+1. 오류 종류를 한국어로 설명해 (예: SyntaxError → "문법 오류", NameError → "변수 이름 오류", IndentationError → "들여쓰기 오류", TypeError → "타입 오류", ZeroDivisionError → "0으로 나누기 오류")
+2. 코드에서 오류가 난 줄을 직접 짚어줘 (예: "3번째 줄 `for i in range` 부분이 문제야")
+3. 왜 오류가 났는지 한 문장으로 설명해
+4. 어떻게 고치면 되는지 방향만 알려줘 (정답 코드 전체는 주지 마)
 
-[코드 분석 요청 처리]
-- "코드 분석해줘" "뭐가 틀린거야" 등의 요청이 오면, 학생 코드에서 구체적인 문제점을 짚어줘.
-- 이전 대화에서 이미 한 말을 그대로 반복하지 마. 매번 새로운 관점이나 더 구체적인 힌트를 줘야 해.
-- 완성된 정답 코드 전체를 주는 건 금지.`
+[단계적 힌트 - 오류 없을 때]
+- 1번 막힌 경우: 방향만 알려주고 질문으로 끝내.
+- 2번 막힌 경우: 코드 구조를 구체적으로 알려줘. 핵심 부분은 ___ 로 빈칸 힌트 줘도 돼.
+- 3번 이상 막힌 경우: 거의 다 알려줘. 마지막 한 줄만 직접 채우게 해.
+
+[항상 지킬 것]
+- 이전 대화에서 한 말 그대로 반복 금지. 매번 더 구체적으로.
+- 완성된 정답 코드 전체 제공 금지.`
 
 function buildUserMessage(
   missionTitle: string,
@@ -80,7 +86,20 @@ function buildUserMessage(
   } else {
     parts.push('[학생 코드] 아직 작성 안 함')
   }
-  if (errorMsg) parts.push(`[오류 메시지] ${errorMsg}`)
+  if (errorMsg) {
+    // 오류 종류 자동 분류
+    const errType =
+      errorMsg.includes('SyntaxError') ? '문법 오류(SyntaxError)' :
+      errorMsg.includes('IndentationError') ? '들여쓰기 오류(IndentationError)' :
+      errorMsg.includes('NameError') ? '변수 이름 오류(NameError)' :
+      errorMsg.includes('TypeError') ? '타입 오류(TypeError)' :
+      errorMsg.includes('ZeroDivisionError') ? '0으로 나누기 오류(ZeroDivisionError)' :
+      errorMsg.includes('IndexError') ? '인덱스 오류(IndexError)' :
+      errorMsg.includes('KeyError') ? '키 오류(KeyError)' :
+      errorMsg.includes('ValueError') ? '값 오류(ValueError)' :
+      errorMsg.includes('AttributeError') ? '속성 오류(AttributeError)' : '실행 오류'
+    parts.push(`[오류 발생 - 반드시 이것부터 설명해]\n오류 종류: ${errType}\n오류 내용: ${errorMsg}`)
+  }
   if (chatHistory.length > 0) {
     const hist = chatHistory.slice(-8).map(m => `${m.role === 'ai' ? 'AI튜터' : '학생'}: ${m.content}`).join('\n')
     parts.push(`[이전 대화]\n${hist}`)
