@@ -32,6 +32,58 @@ export interface Mission {
   pages: TutorialPage[]
 }
 
+export interface TutorialPart {
+  part: number
+  title: string
+  emoji: string
+  unitRange: string
+  description: string
+  missionIds: number[]
+  color: string
+  comingSoon?: boolean
+}
+
+export const TUTORIAL_PARTS: TutorialPart[] = [
+  {
+    part: 1,
+    title: '방송 장비 점검하기',
+    emoji: '🎬',
+    unitRange: '단원 1~2',
+    description: '변수와 연산',
+    missionIds: [1, 2],
+    color: '#7C3AED',
+  },
+  {
+    part: 2,
+    title: '생방송 큐시트 조율하기',
+    emoji: '🎤',
+    unitRange: '단원 3~4',
+    description: '조건문과 반복문',
+    missionIds: [3, 4],
+    color: '#2563EB',
+  },
+  {
+    part: 3,
+    title: '오디오 이펙터 자동화',
+    emoji: '📻',
+    unitRange: '단원 5~6',
+    description: '리스트와 함수',
+    missionIds: [],
+    color: '#059669',
+    comingSoon: true,
+  },
+  {
+    part: 4,
+    title: '최종 축제 다큐멘터리',
+    emoji: '🏆',
+    unitRange: '단원 7~8',
+    description: '문자열 및 종합',
+    missionIds: [],
+    color: '#D97706',
+    comingSoon: true,
+  },
+]
+
 export const TUTORIAL_MISSIONS: Mission[] = [
   {
     id: 1,

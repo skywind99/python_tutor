@@ -3,28 +3,39 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { UNITS, MISSIONS, LEVEL_INFO } from '@/data/missions'
-import { TUTORIAL_MISSIONS } from '@/data/tutorial'
+import { TUTORIAL_MISSIONS, TUTORIAL_PARTS } from '@/data/tutorial'
 
 const TUTORIAL_TOTAL_PAGES = TUTORIAL_MISSIONS.reduce((s, m) => s + m.pages.length, 0)
 
 export default function LearnPage() {
   const [customMissions, setCustomMissions] = useState<any[]>([])
-  const [tutorialDone, setTutorialDone] = useState(0)
+  const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetch('/api/custom-missions').then(r => r.json()).then(d => setCustomMissions(d.missions || []))
 
-    // 튜토리얼 진행도 로드
     async function loadTutorial() {
       const sb = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
       const { data: { user } } = await sb.auth.getUser()
       if (!user) return
-      const { count } = await sb.from('xp_logs').select('*', { count: 'exact', head: true })
+      const { data: logs } = await sb.from('xp_logs').select('source_id')
         .eq('student_id', user.id).like('source_id', 'tutorial-%')
-      setTutorialDone(count || 0)
+      if (logs) {
+        const keys = new Set(logs.map((l: any) => l.source_id.slice('tutorial-'.length)))
+        setCompletedKeys(keys)
+      }
     }
     loadTutorial()
   }, [])
+
+  function getPartProgress(partMissionIds: number[]) {
+    const missions = TUTORIAL_MISSIONS.filter(m => partMissionIds.includes(m.id))
+    const done = missions.reduce((s, m) => s + m.pages.filter(p => completedKeys.has(`${m.id}-${p.id}`)).length, 0)
+    const total = missions.reduce((s, m) => s + m.pages.length, 0)
+    return { done, total }
+  }
+
+  const tutorialDone = completedKeys.size
 
   const customByUnit = customMissions.reduce((acc, m) => {
     if (m.unit_id) acc[m.unit_id] = (acc[m.unit_id] || 0) + 1
@@ -42,30 +53,50 @@ export default function LearnPage() {
 
       {/* 튜토리얼 카드 */}
       <Link href="/tutorial" className="block mb-4">
-        <div className="rounded-2xl p-4 flex items-center gap-4 hover:opacity-90 transition-opacity"
+        <div className="rounded-2xl p-4 hover:opacity-90 transition-opacity"
           style={{ background: 'linear-gradient(135deg, #302B63 0%, #24243E 100%)', border: '1px solid rgba(139,92,246,0.3)' }}>
-          <div className="text-3xl w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)' }}>
-            🎙️
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-white text-sm">슬기로운 방송부 생활 · 튜토리얼</div>
-            <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
-              파이썬 기초 개념을 스토리로 배워요 · 단원 학습 전에 먼저!
+          <div className="flex items-center gap-3 mb-3">
+            <div className="text-2xl w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)' }}>
+              🎙️
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.1)', maxWidth: 120 }}>
-                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min((tutorialDone / TUTORIAL_TOTAL_PAGES) * 100, 100)}%`, background: '#a78bfa' }} />
+            <div className="flex-1">
+              <div className="font-bold text-white text-sm">슬기로운 방송부 생활</div>
+              <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                스토리로 배우는 파이썬 · 단원 전에 먼저!
               </div>
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                {tutorialDone}/{TUTORIAL_TOTAL_PAGES} 완료
-              </span>
-              {tutorialDone >= TUTORIAL_TOTAL_PAGES && (
-                <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>✓ 클리어!</span>
-              )}
             </div>
+            {tutorialDone >= TUTORIAL_TOTAL_PAGES
+              ? <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>✓ 완주!</span>
+              : <div className="text-white/30 text-sm">→</div>
+            }
           </div>
-          <div className="text-white/30 text-lg">→</div>
+          {/* PART별 진행도 */}
+          <div className="grid grid-cols-4 gap-2">
+            {TUTORIAL_PARTS.map(part => {
+              const { done, total } = getPartProgress(part.missionIds)
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0
+              const allDone = total > 0 && done === total
+              return (
+                <div key={part.part} className="rounded-xl p-2 text-center"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${allDone ? part.color : 'rgba(255,255,255,0.08)'}` }}>
+                  <div className="text-base mb-1">{allDone ? '✅' : part.comingSoon ? '🔒' : part.emoji}</div>
+                  <div className="text-xs font-bold text-white/60">PART {part.part}</div>
+                  {!part.comingSoon && (
+                    <>
+                      <div className="h-1 rounded-full mt-1.5 mb-1" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: part.color }} />
+                      </div>
+                      <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{done}/{total}</div>
+                    </>
+                  )}
+                  {part.comingSoon && (
+                    <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>준비중</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </Link>
 
