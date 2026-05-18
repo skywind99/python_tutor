@@ -105,10 +105,10 @@ export default function LearnPage() {
             const partUnits = UNITS.filter(u => Math.ceil(u.id / 2) === part.part)
             const tutorialMissions = TUTORIAL_MISSIONS.filter(m => part.missionIds.includes(m.id))
             const isShowing = showTutorial[part.part]
-            const locked = part.comingSoon || isPartLocked(part.part)
-            const lockedMsg = part.comingSoon ? '준비중' : 'PART ' + (part.part - 1) + ' 완료 후 해금'
+            const progressLocked = isPartLocked(part.part)
 
-            if (locked) {
+            // 진행 잠금: PART 전체 숨김
+            if (progressLocked) {
               return (
                 <div key={part.part} style={{ opacity: 0.3 }}>
                   <div className="flex items-center gap-3 px-1 mb-3">
@@ -116,7 +116,7 @@ export default function LearnPage() {
                     <span className="text-xs font-bold text-white/50">PART {part.part}</span>
                     <span className="text-sm text-white/40">{part.title}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full text-white/30"
-                      style={{ border: '1px solid rgba(255,255,255,0.1)' }}>{lockedMsg}</span>
+                      style={{ border: '1px solid rgba(255,255,255,0.1)' }}>PART {part.part - 1} 완료 후 해금</span>
                   </div>
                   <div className="rounded-2xl p-5 flex items-center gap-4"
                     style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -140,65 +140,76 @@ export default function LearnPage() {
                   <div className="flex-1 h-px ml-2" style={{ background: `${part.color}30` }} />
                 </div>
 
-                {/* 튜토리얼 섹션 */}
-                <div className="rounded-2xl overflow-hidden mb-4"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${part.color}30` }}>
-
-                  {/* 튜토리얼 헤더 */}
-                  <div className="px-5 py-3.5 flex items-center justify-between"
-                    style={{ borderBottom: isShowing ? `1px solid ${part.color}20` : 'none' }}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: `${part.color}20`, color: part.color }}>튜토리얼</span>
-                      <span className="text-sm font-semibold text-white">
-                        [PART {part.part}] {part.title}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setShowTutorial(p => ({ ...p, [part.part]: !p[part.part] }))}
-                      className="text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
-                      style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)' }}>
-                      {isShowing ? (
-                        <><span style={{ color: part.color }}>▲</span> 숨기기</>
-                      ) : (
-                        <><span style={{ color: part.color }}>▼</span> 튜토리얼 보기</>
-                      )}
-                    </button>
+                {/* 튜토리얼 섹션: comingSoon이면 준비중 배너만 */}
+                {part.comingSoon ? (
+                  <div className="rounded-2xl px-5 py-4 mb-4 flex items-center gap-3"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${part.color}20`, opacity: 0.5 }}>
+                    <span>🔒</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: `${part.color}20`, color: part.color }}>튜토리얼</span>
+                    <span className="text-sm text-white/50">[PART {part.part}] {part.title}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full text-white/30 ml-auto"
+                      style={{ border: '1px solid rgba(255,255,255,0.1)' }}>준비중</span>
                   </div>
+                ) : (
+                  <div className="rounded-2xl overflow-hidden mb-4"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${part.color}30` }}>
 
-                  {/* 튜토리얼 미션 카드들 */}
-                  {isShowing && (
-                    <div className="p-4 grid grid-cols-2 gap-3">
-                      {tutorialMissions.map(mission => {
-                        const { done, total } = getMissionProgress(mission.id)
-                        const allDone = total > 0 && done === total
-                        return (
-                          <Link key={mission.id} href={`/tutorial?part=${part.part}`}>
-                            <div className="rounded-xl p-4 cursor-pointer transition-all hover:scale-[1.02]"
-                              style={{
-                                background: allDone ? `${part.color}15` : 'rgba(255,255,255,0.04)',
-                                border: `1px solid ${allDone ? part.color + '50' : 'rgba(255,255,255,0.08)'}`,
-                              }}>
-                              <div className="text-3xl mb-2">{mission.icon}</div>
-                              <div className="text-sm font-bold text-white leading-tight">{mission.title}</div>
-                              <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{mission.subtitle}</div>
-                              {/* 진행 도트 */}
-                              <div className="flex gap-1 mt-2.5 flex-wrap">
-                                {mission.pages.map(p => (
-                                  <div key={p.id} className="w-2 h-2 rounded-full transition-all"
-                                    style={{ background: completedKeys.has(`${mission.id}-${p.id}`) ? part.color : 'rgba(255,255,255,0.12)' }} />
-                                ))}
-                              </div>
-                              <div className="text-xs mt-1.5" style={{ color: allDone ? part.color : 'rgba(255,255,255,0.25)' }}>
-                                {allDone ? '✓ 완료' : `${done} / ${total} 완료`}
-                              </div>
-                            </div>
-                          </Link>
-                        )
-                      })}
+                    {/* 튜토리얼 헤더 */}
+                    <div className="px-5 py-3.5 flex items-center justify-between"
+                      style={{ borderBottom: isShowing ? `1px solid ${part.color}20` : 'none' }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                          style={{ background: `${part.color}20`, color: part.color }}>튜토리얼</span>
+                        <span className="text-sm font-semibold text-white">
+                          [PART {part.part}] {part.title}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setShowTutorial(p => ({ ...p, [part.part]: !p[part.part] }))}
+                        className="text-xs px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
+                        style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)' }}>
+                        {isShowing ? (
+                          <><span style={{ color: part.color }}>▲</span> 숨기기</>
+                        ) : (
+                          <><span style={{ color: part.color }}>▼</span> 튜토리얼 보기</>
+                        )}
+                      </button>
                     </div>
-                  )}
-                </div>
+
+                    {/* 튜토리얼 미션 카드들 */}
+                    {isShowing && (
+                      <div className="p-4 grid grid-cols-2 gap-3">
+                        {tutorialMissions.map(mission => {
+                          const { done, total } = getMissionProgress(mission.id)
+                          const allDone = total > 0 && done === total
+                          return (
+                            <Link key={mission.id} href={`/tutorial?part=${part.part}`}>
+                              <div className="rounded-xl p-4 cursor-pointer transition-all hover:scale-[1.02]"
+                                style={{
+                                  background: allDone ? `${part.color}15` : 'rgba(255,255,255,0.04)',
+                                  border: `1px solid ${allDone ? part.color + '50' : 'rgba(255,255,255,0.08)'}`,
+                                }}>
+                                <div className="text-3xl mb-2">{mission.icon}</div>
+                                <div className="text-sm font-bold text-white leading-tight">{mission.title}</div>
+                                <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{mission.subtitle}</div>
+                                <div className="flex gap-1 mt-2.5 flex-wrap">
+                                  {mission.pages.map(p => (
+                                    <div key={p.id} className="w-2 h-2 rounded-full transition-all"
+                                      style={{ background: completedKeys.has(`${mission.id}-${p.id}`) ? part.color : 'rgba(255,255,255,0.12)' }} />
+                                  ))}
+                                </div>
+                                <div className="text-xs mt-1.5" style={{ color: allDone ? part.color : 'rgba(255,255,255,0.25)' }}>
+                                  {allDone ? '✓ 완료' : `${done} / ${total} 완료`}
+                                </div>
+                              </div>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 단원 섹션 */}
                 <div>
