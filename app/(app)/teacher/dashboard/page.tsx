@@ -23,6 +23,9 @@ export default function TeacherDashboard() {
   const [newClassName, setNewClassName] = useState('')
   const [showNewClassInput, setShowNewClassInput] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [editingClassId, setEditingClassId] = useState<string | null>(null)
+  const [editingClassName, setEditingClassName] = useState('')
+  const [renaming, setRenaming] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -57,6 +60,19 @@ export default function TeacherDashboard() {
     }
     loadStudents()
   }, [selectedClassId])
+
+  async function renameClass() {
+    const name = editingClassName.trim()
+    if (!name || !editingClassId) return
+    setRenaming(true)
+    const { error } = await getClient().from('classes').update({ name }).eq('id', editingClassId)
+    if (!error) {
+      setClasses(prev => prev.map(c => c.id === editingClassId ? { ...c, name } : c))
+    }
+    setEditingClassId(null)
+    setEditingClassName('')
+    setRenaming(false)
+  }
 
   async function createClass() {
     const name = newClassName.trim()
@@ -172,9 +188,38 @@ export default function TeacherDashboard() {
           {/* 선택된 반 초대코드 */}
           {selectedClass && (
             <div className="mt-3 pt-3 border-t border-gray-50 flex items-center justify-between">
-              <span className="text-sm text-gray-600">
-                <span className="font-semibold text-gray-900">{selectedClass.name}</span> · 학생 {students.length}명
-              </span>
+              <div className="flex items-center gap-2">
+                {editingClassId === selectedClass.id ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={editingClassName}
+                      onChange={e => setEditingClassName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') renameClass(); if (e.key === 'Escape') { setEditingClassId(null); setEditingClassName('') } }}
+                      className="border border-indigo-300 rounded-lg px-2 py-1 text-sm font-semibold outline-none focus:border-indigo-500 w-40"
+                    />
+                    <button onClick={renameClass} disabled={renaming || !editingClassName.trim()}
+                      className="px-2.5 py-1 text-xs font-medium text-white rounded-lg disabled:opacity-50"
+                      style={{background:'#4338CA'}}>
+                      {renaming ? '...' : '저장'}
+                    </button>
+                    <button onClick={() => { setEditingClassId(null); setEditingClassName('') }}
+                      className="text-xs text-gray-400 hover:text-gray-600">취소</button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm text-gray-600">
+                      <span className="font-semibold text-gray-900">{selectedClass.name}</span> · 학생 {students.length}명
+                    </span>
+                    <button
+                      onClick={() => { setEditingClassId(selectedClass.id); setEditingClassName(selectedClass.name) }}
+                      className="text-gray-300 hover:text-indigo-500 transition-colors text-sm"
+                      title="반 이름 수정">
+                      ✏️
+                    </button>
+                  </>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">학생 초대코드</span>
                 <span className="text-sm font-bold font-mono text-gray-900 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
