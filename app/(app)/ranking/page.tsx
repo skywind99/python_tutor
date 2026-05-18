@@ -17,6 +17,7 @@ export default function RankingPage() {
   const [classRanking, setClassRanking] = useState<any[]>([])
   const [myRank, setMyRank] = useState(0)
   const [tab, setTab] = useState<'week' | 'all' | 'class'>('all')
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -35,11 +36,15 @@ export default function RankingPage() {
       const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay())
 
       if (teacher) {
-        // 교사: 모든 반 학생 + 반별 집계
+        // 교사: 내 반 학생만 + 반별 집계
         const { data: classes } = await sb.from('classes').select('id, name').eq('teacher_id', user.id)
-        const { data: students } = await sb.from('profiles')
+        const classIds = classes?.map(c => c.id) || []
+        const studentsQuery = sb.from('profiles')
           .select('id, name, class_id, mission_logs(score, passed, hints_used, created_at)')
           .eq('role', 'student')
+        const { data: students } = classIds.length > 0
+          ? await studentsQuery.in('class_id', classIds)
+          : await studentsQuery
 
         if (students) {
           const ranked = students.map((s: any) => {
@@ -68,6 +73,7 @@ export default function RankingPage() {
               }
             }).sort((a, b) => b.totalScore - a.totalScore)
             setClassRanking(classStats)
+            if (classStats.length > 0) setSelectedClassId(classStats[0].id)
           }
         }
       } else {
@@ -132,29 +138,59 @@ export default function RankingPage() {
                   <p className="text-gray-500">아직 생성된 반이 없어요</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                  <div className="grid grid-cols-4 bg-gray-50 px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    <div>순위</div>
-                    <div>반 이름</div>
-                    <div className="text-right">총점</div>
-                    <div className="text-right">인원</div>
+                <>
+                  {/* 반 선택 탭 */}
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {classRanking.map(cls => (
+                      <button key={cls.id} onClick={() => setSelectedClassId(cls.id)}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${selectedClassId === cls.id ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-800'}`}>
+                        {cls.name}
+                        <span className="ml-1.5 text-xs opacity-60">{cls.memberCount}명</span>
+                      </button>
+                    ))}
                   </div>
-                  {classRanking.map((cls, i) => (
-                    <div key={cls.id} className="grid grid-cols-4 px-5 py-4 items-center border-t border-gray-50 hover:bg-gray-50">
-                      <div className="flex items-center gap-2">
-                        {i < 3
-                          ? <span className="text-xl">{medals[i]}</span>
-                          : <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500">{i + 1}</span>}
+
+                  {/* 선택된 반의 학생 순위 */}
+                  {(() => {
+                    const selectedCls = classRanking.find(c => c.id === selectedClassId)
+                    const classStudents = [...ranking]
+                      .filter(r => r.class_id === selectedClassId)
+                      .sort((a, b) => b.totalScore - a.totalScore)
+                    return classStudents.length === 0 ? (
+                      <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                        <div className="text-4xl mb-3">👤</div>
+                        <p className="text-gray-500">이 반에 학생이 없어요</p>
                       </div>
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">{cls.name}</div>
-                        <div className="text-xs text-gray-400">미션 {cls.missions}개 완료</div>
+                    ) : (
+                      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                        {selectedCls && (
+                          <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                            <span className="text-sm font-semibold text-gray-700">{selectedCls.name} 학생 순위</span>
+                            <span className="text-xs text-gray-400">총점 {selectedCls.totalScore.toLocaleString()}점 · 미션 {selectedCls.missions}개</span>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-4 bg-gray-50 px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+                          <div>순위</div><div>이름</div><div className="text-right">점수</div><div className="text-right">미션</div>
+                        </div>
+                        {classStudents.map((r, i) => (
+                          <div key={r.id} className="grid grid-cols-4 px-5 py-4 items-center border-t border-gray-50 hover:bg-gray-50">
+                            <div className="flex items-center gap-2">
+                              {i < 3
+                                ? <span className="text-xl">{medals[i]}</span>
+                                : <span className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500">{i + 1}</span>}
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900">{r.name}</div>
+                              <div className="text-xs text-gray-400">힌트 평균 {r.avgHints}개</div>
+                            </div>
+                            <div className="text-right text-sm font-bold text-gray-900">{r.totalScore.toLocaleString()}점</div>
+                            <div className="text-right text-sm text-gray-500">{r.missions}/{MISSIONS.length}</div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-right text-sm font-bold text-gray-900">{cls.totalScore.toLocaleString()}점</div>
-                      <div className="text-right text-sm text-gray-500">{cls.memberCount}명</div>
-                    </div>
-                  ))}
-                </div>
+                    )
+                  })()}
+                </>
               )
             ) : (
               // 학생: 내 반 안에서 랭킹 (전체와 같음)

@@ -24,6 +24,7 @@ export default function ProblemsPage() {
   const [tab, setTab] = useState<'solutions'|'ai'>('solutions')
   const [customMissions, setCustomMissions] = useState<any[]>([])
   const [customLogs, setCustomLogs] = useState<any[]>([])
+  const [classesData, setClassesData] = useState<{ id: string; name: string }[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [movingId, setMovingId] = useState<string | null>(null)
   const [editingMission, setEditingMission] = useState<any | null>(null)
@@ -46,11 +47,12 @@ export default function ProblemsPage() {
       const { data: prof } = await sb.from('profiles').select('role, gemini_key').eq('id', user.id).single()
       if (prof?.role !== 'teacher') { router.push('/dashboard'); return }
 
-      const { data: classes } = await sb.from('classes').select('id').eq('teacher_id', user.id)
+      const { data: classes } = await sb.from('classes').select('id, name').eq('teacher_id', user.id)
       if (!classes?.length) { setLoading(false); return }
       const classIds = classes.map((c: any) => c.id)
+      setClassesData(classes)
 
-      const { data: studs } = await sb.from('profiles').select('id, name').in('class_id', classIds).eq('role', 'student')
+      const { data: studs } = await sb.from('profiles').select('id, name, class_id').in('class_id', classIds).eq('role', 'student')
       setStudents(studs || [])
 
       if (studs?.length) {
@@ -164,14 +166,23 @@ export default function ProblemsPage() {
   function getStudentSolutions(missionId: number) {
     return logs
       .filter(l => l.mission_id === missionId)
-      .map(l => ({ ...l, studentName: students.find(s => s.id === l.student_id)?.name || '알 수 없음' }))
-      .sort((a, b) => b.score - a.score)
+      .map(l => {
+        const student = students.find(s => s.id === l.student_id)
+        return {
+          ...l,
+          studentName: student?.name || '알 수 없음',
+          classId: student?.class_id || null,
+        }
+      })
   }
 
   function getCustomMissionSolvers(customMissionId: string) {
     return customLogs
       .filter(l => l.custom_mission_id === customMissionId && l.passed)
-      .map(l => ({ ...l, studentName: students.find(s => s.id === l.student_id)?.name || '알 수 없음' }))
+      .map(l => {
+        const student = students.find(s => s.id === l.student_id)
+        return { ...l, studentName: student?.name || '알 수 없음', classId: student?.class_id || null }
+      })
   }
 
   if (loading) return (
@@ -437,45 +448,70 @@ export default function ProblemsPage() {
 
             {tab === 'solutions' && (
               <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-                {getStudentSolutions(selectedMission.id).length === 0 ? (
-                  <div className="p-10 text-center text-gray-400">
-                    <div className="text-4xl mb-3">📝</div>
-                    <p className="text-sm">아직 이 문제를 시도한 학생이 없어요</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {getStudentSolutions(selectedMission.id).map((sol, i) => (
-                      <div key={i} className="p-5">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
-                              style={{ background: '#4338CA' }}>
-                              {sol.studentName?.[0] || '?'}
-                            </div>
-                            <div>
-                              <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                                  sol.passed ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-400'
-                                }`}>{sol.passed ? '✓ 통과' : '미통과'}</span>
-                                <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
-                                <span className="text-xs text-gray-400">시도 {sol.attempts}회</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-bold text-gray-900">{sol.score}점</div>
-                          </div>
+                {(() => {
+                  const solutions = getStudentSolutions(selectedMission.id)
+                  const solvedIds = new Set(solutions.map(s => s.student_id))
+                  if (solutions.length === 0 && students.length === 0) return (
+                    <div className="p-10 text-center text-gray-400">
+                      <div className="text-4xl mb-3">📝</div>
+                      <p className="text-sm">아직 이 문제를 시도한 학생이 없어요</p>
+                    </div>
+                  )
+                  return classesData.map(cls => {
+                    const clsStudents = students.filter(s => s.class_id === cls.id)
+                    const clsSolutions = solutions.filter(s => s.classId === cls.id).sort((a, b) => b.score - a.score)
+                    const unsolved = clsStudents.filter(s => !solvedIds.has(s.id))
+                    if (clsStudents.length === 0) return null
+                    return (
+                      <div key={cls.id}>
+                        <div className="px-5 py-2.5 bg-gray-50 border-y border-gray-100 flex items-center justify-between sticky top-0 z-10">
+                          <span className="text-xs font-bold text-gray-600">{cls.name}</span>
+                          <span className="text-xs text-gray-400">
+                            시도 {clsSolutions.length}명 · 통과 {clsSolutions.filter(s => s.passed).length}명 · 미시도 {unsolved.length}명
+                          </span>
                         </div>
-                        {sol.code && (
-                          <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
-                            <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
-                          </div>
-                        )}
+                        <div className="divide-y divide-gray-50">
+                          {clsSolutions.map((sol, i) => (
+                            <div key={i} className="p-5">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
+                                    style={{ background: '#4338CA' }}>
+                                    {sol.studentName?.[0] || '?'}
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                        sol.passed ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-400'
+                                      }`}>{sol.passed ? '✓ 통과' : '미통과'}</span>
+                                      <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
+                                      <span className="text-xs text-gray-400">시도 {sol.attempts}회</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-sm font-bold text-gray-900">{sol.score}점</div>
+                              </div>
+                              {sol.code && (
+                                <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
+                                  <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {unsolved.length > 0 && (
+                            <div className="px-5 py-3 flex flex-wrap gap-1.5 items-center">
+                              <span className="text-xs text-gray-400 mr-1">미시도:</span>
+                              {unsolved.map(s => (
+                                <span key={s.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">{s.name}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    )
+                  })
+                })()}
               </div>
             )}
 
@@ -550,59 +586,62 @@ export default function ProblemsPage() {
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
               {(() => {
                 const solvers = getCustomMissionSolvers(selectedCustomMission.id)
-                const solverIds = new Set(solvers.map((s: any) => s.student_id))
-                const unsolvedStudents = students.filter(s => !solverIds.has(s.id))
-                return (
-                  <>
-                    {solvers.length === 0 ? (
-                      <div className="p-10 text-center text-gray-400">
-                        <div className="text-4xl mb-3">📝</div>
-                        <p className="text-sm">아직 이 문제를 완료한 학생이 없어요</p>
+                const solvedIds = new Set(solvers.map((s: any) => s.student_id))
+                return classesData.map(cls => {
+                  const clsStudents = students.filter(s => s.class_id === cls.id)
+                  const clsSolvers = solvers.filter((s: any) => s.classId === cls.id)
+                  const unsolved = clsStudents.filter(s => !solvedIds.has(s.id))
+                  if (clsStudents.length === 0) return null
+                  return (
+                    <div key={cls.id}>
+                      <div className="px-5 py-2.5 bg-gray-50 border-y border-gray-100 flex items-center justify-between sticky top-0 z-10">
+                        <span className="text-xs font-bold text-gray-600">{cls.name}</span>
+                        <span className="text-xs text-gray-400">
+                          완료 {clsSolvers.length}명 · 미완료 {unsolved.length}명
+                        </span>
                       </div>
-                    ) : (
-                      <div className="divide-y divide-gray-50">
-                        {solvers.map((sol: any, i: number) => (
-                          <div key={i} className="p-5">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
-                                  style={{ background: '#4338CA' }}>
-                                  {sol.studentName?.[0] || '?'}
-                                </div>
-                                <div>
-                                  <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
-                                  <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-teal-50 text-teal-600">✓ 완료</span>
-                                    <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
+                      {clsSolvers.length === 0 ? (
+                        <div className="px-5 py-4 text-xs text-gray-300">완료한 학생 없음</div>
+                      ) : (
+                        <div className="divide-y divide-gray-50">
+                          {clsSolvers.map((sol: any, i: number) => (
+                            <div key={i} className="p-5">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
+                                    style={{ background: '#4338CA' }}>
+                                    {sol.studentName?.[0] || '?'}
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-teal-50 text-teal-600">✓ 완료</span>
+                                      <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <div className="text-right">
                                 <div className="text-sm font-bold text-gray-900">{sol.score}점</div>
                               </div>
+                              {sol.code && (
+                                <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
+                                  <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
+                                </div>
+                              )}
                             </div>
-                            {sol.code && (
-                              <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
-                                <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {unsolvedStudents.length > 0 && (
-                      <div className="border-t border-gray-50 p-5">
-                        <div className="text-xs font-semibold text-gray-400 mb-3">미완료 학생 ({unsolvedStudents.length}명)</div>
-                        <div className="flex flex-wrap gap-2">
-                          {unsolvedStudents.map((s: any) => (
-                            <span key={s.id} className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">{s.name}</span>
                           ))}
                         </div>
-                      </div>
-                    )}
-                  </>
-                )
+                      )}
+                      {unsolved.length > 0 && (
+                        <div className="px-5 py-3 flex flex-wrap gap-1.5 items-center border-t border-gray-50">
+                          <span className="text-xs text-gray-400 mr-1">미완료:</span>
+                          {unsolved.map((s: any) => (
+                            <span key={s.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">{s.name}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
               })()}
             </div>
           </div>
