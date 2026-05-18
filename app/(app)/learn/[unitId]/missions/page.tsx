@@ -42,6 +42,41 @@ function GemSVG({ type, size=26 }: { type: typeof GEM_TYPES[0], size?: number })
 
 function norm(s: string) { return s.trim().replace(/\r\n/g,'\n').replace(/\s+$/gm,'') }
 
+function parseSkulptError(e: any): string {
+  let typeName = ''
+  let message = ''
+  let lineno: number | null = null
+  if (e && typeof e === 'object') {
+    typeName = e.tp$name || ''
+    try { message = e.args?.v?.[0]?.v || '' } catch {}
+    try { lineno = e.traceback?.[0]?.lineno ?? null } catch {}
+    if (!message) message = String(e)
+  } else {
+    message = String(e)
+  }
+  const typeKo: Record<string, string> = {
+    SyntaxError: '문법 오류', IndentationError: '들여쓰기 오류', NameError: '이름 오류',
+    TypeError: '타입 오류', ValueError: '값 오류', ZeroDivisionError: '0으로 나누기 오류',
+    IndexError: '인덱스 오류', KeyError: '키 오류', AttributeError: '속성 오류',
+    ImportError: '모듈 오류', RecursionError: '무한 재귀',
+  }
+  const hints: Record<string, string> = {
+    SyntaxError: '괄호, 콜론(:), 따옴표가 올바르게 닫혔는지 확인해봐요',
+    IndentationError: 'if / for / while / def 아래는 반드시 4칸 들여써야 해요',
+    NameError: '변수명 오타 또는 선언하기 전에 사용한 건 아닌지 확인해봐요',
+    TypeError: '숫자와 문자를 섞거나, 함수 인자 수가 맞는지 확인해봐요',
+    ValueError: 'int("hello")처럼 변환 불가능한 값을 쓴 건 아닌지 확인해봐요',
+    ZeroDivisionError: '나누는 값이 0이 될 수 있는 경우가 있는지 확인해봐요',
+    IndexError: '리스트 길이보다 큰 인덱스를 사용한 건 아닌지 확인해봐요',
+    KeyError: '딕셔너리에 없는 키를 접근한 건 아닌지 확인해봐요',
+    RecursionError: '함수가 자기 자신을 너무 많이 호출하고 있어요',
+  }
+  const ko = typeKo[typeName] ? `[${typeKo[typeName]}]` : typeName ? `[${typeName}]` : '[오류]'
+  const line = lineno ? ` — ${lineno}번째 줄` : ''
+  const hint = hints[typeName] ? `💡 ${hints[typeName]}` : ''
+  return [ko + line, message, hint].filter(Boolean).join('\n\n')
+}
+
 export default function MissionsPage() {
   const params = useParams()
   const unitId = Number(params.unitId)
@@ -79,7 +114,9 @@ export default function MissionsPage() {
   const gemIdRef = useRef(0)
 
   const [showSuccessLottie, setShowSuccessLottie] = useState(false)
+  const successTypeRef = useRef<'jump'|'confetti'>('confetti')
   const [showErrorLottie, setShowErrorLottie] = useState(false)
+  const [isRuntimeError, setIsRuntimeError] = useState(false)
   const [solutionCode, setSolutionCode] = useState('')
   const [solutionLoading, setSolutionLoading] = useState(false)
   const [showSolution, setShowSolution] = useState(false)
@@ -206,6 +243,7 @@ export default function MissionsPage() {
       } catch (e) { console.error('Custom save failed:', e) }
       setPassedCustom(p => ({ ...p, [String(currentCustom.id)]: true }))
     }
+    successTypeRef.current = successTypeRef.current === 'jump' ? 'confetti' : 'jump'
     setShowSuccessLottie(true)
     setTimeout(() => setShowSuccessLottie(false), 3500)
     setCelebration('🎉 추가문제 완료!')
@@ -215,6 +253,8 @@ export default function MissionsPage() {
   const runCode = async () => {
     if (!pyReady || running) return
     setRunning(true)
+    setIsRuntimeError(false)
+    setDiffMsg('')
     const Sk = window.Sk
 
     if (currentCustom) {
@@ -245,8 +285,8 @@ export default function MissionsPage() {
           await onPassCustom()
         }
       } catch (e: any) {
-        setOutput(String(e).replace(/^.*?Error:/, '오류:')); setOutputOk(false)
-        setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
+        setOutput(parseSkulptError(e)); setOutputOk(false); setIsRuntimeError(true)
+        setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2500)
       }
       setRunning(false)
       return
@@ -269,7 +309,9 @@ export default function MissionsPage() {
           results.push({ label: tc.label, passed: norm(actual) === norm(tc.expectedOutput), actual, expected: tc.expectedOutput, inputs: tc.inputs })
         }
       } catch (e: any) {
-        setOutput(String(e).replace(/^.*?Error:/,'오류:')); setOutputOk(false); setRunning(false); return
+        setOutput(parseSkulptError(e)); setOutputOk(false); setIsRuntimeError(true)
+        setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2500)
+        setRunning(false); return
       }
       setTestResults(results)
       const allPassed = results.every(r => r.passed)
@@ -307,8 +349,8 @@ export default function MissionsPage() {
         await onPass(actual)
       }
     } catch (e: any) {
-      setOutput(String(e).replace(/^.*?Error:/,'오류:')); setOutputOk(false)
-      setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2200)
+      setOutput(parseSkulptError(e)); setOutputOk(false); setIsRuntimeError(true)
+      setShowErrorLottie(true); setTimeout(() => setShowErrorLottie(false), 2500)
     }
     setRunning(false)
   }
@@ -330,6 +372,7 @@ export default function MissionsPage() {
     setScorePopup({ text: `+${s}` })
     setTimeout(() => setScorePopup(null), 1500)
 
+    successTypeRef.current = successTypeRef.current === 'jump' ? 'confetti' : 'jump'
     setShowSuccessLottie(true)
     setTimeout(() => setShowSuccessLottie(false), 3500)
 
@@ -679,11 +722,6 @@ export default function MissionsPage() {
               {outputOk === false && (
                 <span className="text-xs font-bold" style={{color:'#f85149'}}>✗ 아직 아니에요</span>
               )}
-              {showErrorLottie && (
-                <div style={{width:40,height:40}}>
-                  <DotLottie src="/lottie/animation/Cat Crying emojiSticker animation.lottie" loop autoplay />
-                </div>
-              )}
               {role === 'teacher' && !currentCustom && (
                 <button onClick={fetchSolution} disabled={solutionLoading}
                   className="ml-auto text-xs px-3 py-1 rounded-lg font-medium transition-all disabled:opacity-40"
@@ -731,12 +769,20 @@ export default function MissionsPage() {
                 </div>
               ) : output ? (
                 <div>
-                  <pre className="text-xs font-mono whitespace-pre-wrap mb-2" style={{color:'#c9d1d9'}}>{output}</pre>
-                  {outputOk===false && diffMsg && (
-                    <div className="text-xs rounded-lg px-3 py-2 mt-2"
-                      style={{background:'rgba(248,81,73,0.1)',color:'#f85149',border:'1px solid rgba(218,54,51,0.4)'}}>
-                      {diffMsg}
+                  {isRuntimeError ? (
+                    <div className="rounded-xl p-3 mt-1" style={{background:'rgba(248,81,73,0.08)',border:'1px solid rgba(218,54,51,0.35)'}}>
+                      <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed" style={{color:'#f85149'}}>{output}</pre>
                     </div>
+                  ) : (
+                    <>
+                      <pre className="text-xs font-mono whitespace-pre-wrap mb-2" style={{color:'#c9d1d9'}}>{output}</pre>
+                      {outputOk===false && diffMsg && (
+                        <div className="text-xs rounded-lg px-3 py-2 mt-2"
+                          style={{background:'rgba(248,81,73,0.1)',color:'#f85149',border:'1px solid rgba(218,54,51,0.4)'}}>
+                          {diffMsg}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
@@ -814,7 +860,21 @@ export default function MissionsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
           style={{background:'rgba(0,0,0,0.18)'}}>
           <div style={{width:320,height:320}}>
-            <DotLottie src="/lottie/animation/Cute Mascot Jumping Character.lottie" loop={false} autoplay />
+            <DotLottie
+              src={successTypeRef.current === 'jump'
+                ? '/lottie/animation/Cute Mascot Jumping Character.lottie'
+                : '/lottie/animation/Confetti.lottie'}
+              loop={false} autoplay />
+          </div>
+        </div>
+      )}
+
+      {/* ── 에러 오버레이 (고양이 크게) ── */}
+      {showErrorLottie && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{background:'rgba(0,0,0,0.15)'}}>
+          <div style={{width:300,height:300}}>
+            <DotLottie src="/lottie/animation/Cat Crying emojiSticker animation.lottie" loop autoplay />
           </div>
         </div>
       )}
