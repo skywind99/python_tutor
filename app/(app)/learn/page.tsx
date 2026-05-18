@@ -67,6 +67,21 @@ export default function LearnPage() {
     return { done, total: m.pages.length }
   }
 
+  function getPartProgress(missionIds: number[]) {
+    const missions = TUTORIAL_MISSIONS.filter(m => missionIds.includes(m.id))
+    const done = missions.reduce((s, m) => s + m.pages.filter(p => completedKeys.has(`${m.id}-${p.id}`)).length, 0)
+    const total = missions.reduce((s, m) => s + m.pages.length, 0)
+    return { done, total }
+  }
+
+  function isPartLocked(partNum: number) {
+    if (partNum <= 1) return false
+    const prevPart = TUTORIAL_PARTS.find(p => p.part === partNum - 1)
+    if (!prevPart || prevPart.comingSoon) return true
+    const { done, total } = getPartProgress(prevPart.missionIds)
+    return total === 0 || done < total
+  }
+
   return (
     <div className="min-h-screen relative" style={{ background: 'linear-gradient(180deg, #080818 0%, #0c1428 50%, #080818 100%)' }}>
       <StarBg />
@@ -90,8 +105,10 @@ export default function LearnPage() {
             const partUnits = UNITS.filter(u => Math.ceil(u.id / 2) === part.part)
             const tutorialMissions = TUTORIAL_MISSIONS.filter(m => part.missionIds.includes(m.id))
             const isShowing = showTutorial[part.part]
+            const locked = part.comingSoon || isPartLocked(part.part)
+            const lockedMsg = part.comingSoon ? '준비중' : 'PART ' + (part.part - 1) + ' 완료 후 해금'
 
-            if (part.comingSoon) {
+            if (locked) {
               return (
                 <div key={part.part} style={{ opacity: 0.3 }}>
                   <div className="flex items-center gap-3 px-1 mb-3">
@@ -99,7 +116,7 @@ export default function LearnPage() {
                     <span className="text-xs font-bold text-white/50">PART {part.part}</span>
                     <span className="text-sm text-white/40">{part.title}</span>
                     <span className="text-xs px-2 py-0.5 rounded-full text-white/30"
-                      style={{ border: '1px solid rgba(255,255,255,0.1)' }}>준비중</span>
+                      style={{ border: '1px solid rgba(255,255,255,0.1)' }}>{lockedMsg}</span>
                   </div>
                   <div className="rounded-2xl p-5 flex items-center gap-4"
                     style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
