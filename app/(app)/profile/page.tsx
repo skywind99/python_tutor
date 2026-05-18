@@ -29,6 +29,7 @@ export default function ProfilePage() {
   const [groqMsg, setGroqMsg] = useState('')
   const [quota, setQuota] = useState<any>(null)
   const [quotaLoading, setQuotaLoading] = useState(false)
+  const [showApiInfo, setShowApiInfo] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -300,7 +301,42 @@ export default function ProfilePage() {
           {/* 잔여량 확인 */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">📊 API 잔여량</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-700">📊 API 잔여량</span>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowApiInfo(v => !v)}
+                    className="w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center transition-colors"
+                    style={{ background: showApiInfo ? '#6366f1' : '#e0e7ff', color: showApiInfo ? '#fff' : '#6366f1' }}>
+                    !
+                  </button>
+                  {showApiInfo && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowApiInfo(false)} />
+                      <div className="absolute left-0 top-6 z-20 w-72 rounded-2xl p-4 shadow-xl text-xs space-y-2.5"
+                        style={{ background: '#1e1b4b', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                        <div className="font-bold text-white text-sm mb-1">API 사용량이란?</div>
+                        <div>
+                          <span className="font-semibold text-indigo-300">요청 수</span>
+                          <span className="text-white/60"> — 학생이 힌트 버튼을 누를 때마다 1회 증가해요. 하루 제한이 있어서 다 쓰면 그날은 힌트를 못 써요.</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-indigo-300">토큰 수</span>
+                          <span className="text-white/60"> — AI가 읽고 쓴 텍스트 양이에요. 힌트 1회에 약 500토큰 소모돼요.</span>
+                        </div>
+                        <div className="pt-1 border-t border-white/10">
+                          <span className="font-semibold text-blue-300">Gemini</span>
+                          <span className="text-white/60"> — 개념/예제 설명에 사용 · 무료 키로도 하루 1,500회 가능</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-orange-300">Groq</span>
+                          <span className="text-white/60"> — 미션 힌트에 사용 · 빠르고 무료 · 하루 약 30회 제한</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <a href="https://aistudio.google.com/" target="_blank" rel="noopener"
                   className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
