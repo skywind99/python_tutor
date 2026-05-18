@@ -153,6 +153,7 @@ async function callGroq(groqKey: string, userMessage: string, retry = false): Pr
       temperature: retry ? 0.3 : 0.7,
     }),
   })
+  if (res.status === 429) return { res, text: '' }  // 429는 caller가 처리
   if (!res.ok) return null
   const data = await res.json()
   const text = (data.choices?.[0]?.message?.content || '').trim()
@@ -164,49 +165,50 @@ export async function POST(req: NextRequest) {
     const { missionTitle, missionDesc, code, studentMessage, chatHistory = [], errorMsg, userId } = await req.json()
     const userMessage = buildUserMessage(missionTitle, missionDesc, code, studentMessage, chatHistory, errorMsg)
 
-    if (userId) {
-      const { geminiKey, groqKey, teacherId } = await getTeacherKeys(userId)
+    // 선생님 키 우선, 없으면 서버 환경변수 키 사용
+    const teacherKeys = userId ? await getTeacherKeys(userId) : { geminiKey: null, groqKey: null, teacherId: null }
+    const geminiKey = teacherKeys.geminiKey || process.env.GEMINI_API_KEY || null
+    const groqKey = teacherKeys.groqKey || process.env.GROQ_API_KEY || null
+    const teacherId = teacherKeys.teacherId
 
-      // Gemini 우선
-      if (geminiKey) {
-        try {
-          const genAI = new GoogleGenerativeAI(geminiKey)
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite', systemInstruction: SYSTEM_PROMPT })
-          const result = await model.generateContent(userMessage)
-          const text = result.response.text().trim()
-          return NextResponse.json({ hint: text, provider: 'gemini' })
-        } catch {
-          // Gemini 실패 시 Groq로 fallback
+    // Gemini 우선 (분당 1,500회 — 동시 접속에 강함)
+    if (geminiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiKey)
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite', systemInstruction: SYSTEM_PROMPT })
+        const result = await model.generateContent(userMessage)
+        const text = result.response.text().trim()
+        return NextResponse.json({ hint: text, provider: 'gemini' })
+      } catch {
+        // Gemini 실패 시 Groq로 fallback
+      }
+    }
+
+    // Groq fallback — raw fetch로 rate limit 헤더 캡처
+    if (groqKey) {
+      const groqResult = await callGroq(groqKey, userMessage)
+      if (!groqResult) return NextResponse.json({ error: '힌트를 불러오지 못했어요.' }, { status: 500 })
+
+      if (groqResult.res.status === 429) {
+        return NextResponse.json({ error: 'AI 요청이 너무 많아요. 잠시 후 다시 눌러보세요! 🙏' }, { status: 429 })
+      }
+
+      let { text } = groqResult
+
+      // 한자·일본어 감지 시 1회 재시도
+      if (hasForeignChars(text)) {
+        const retryResult = await callGroq(groqKey, userMessage, true)
+        if (retryResult?.text && !hasForeignChars(retryResult.text)) {
+          text = retryResult.text
+        } else if (retryResult?.text) {
+          text = retryResult.text.split('').filter(ch => { const c = ch.charCodeAt(0); return !((c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) || (c >= 0x3040 && c <= 0x30FF) || (c >= 0xF900 && c <= 0xFAFF)) }).join('').trim()
         }
       }
 
-      // Groq — raw fetch로 rate limit 헤더 캡처
-      if (groqKey) {
-        const groqResult = await callGroq(groqKey, userMessage)
-        if (!groqResult) return NextResponse.json({ error: '힌트를 불러오지 못했어요.' }, { status: 500 })
+      // 비동기로 quota 저장 (응답 지연 없음)
+      if (teacherId) saveGroqQuota(teacherId, groqResult.res.headers)
 
-        if (groqResult.res.status === 429) {
-          return NextResponse.json({ error: 'AI 요청 한도 초과. 잠시 후 다시 시도해주세요.' }, { status: 429 })
-        }
-
-        let { text } = groqResult
-
-        // 한자·일본어 감지 시 1회 재시도
-        if (hasForeignChars(text)) {
-          const retryResult = await callGroq(groqKey, userMessage, true)
-          if (retryResult?.text && !hasForeignChars(retryResult.text)) {
-            text = retryResult.text
-          } else if (retryResult?.text) {
-            // 재시도도 실패 시 한자만 제거
-            text = retryResult.text.split('').filter(ch => { const c = ch.charCodeAt(0); return !((c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF) || (c >= 0x3040 && c <= 0x30FF) || (c >= 0xF900 && c <= 0xFAFF)) }).join('').trim()
-          }
-        }
-
-        // 비동기로 quota 저장 (응답 지연 없음)
-        if (teacherId) saveGroqQuota(teacherId, groqResult.res.headers)
-
-        return NextResponse.json({ hint: text, provider: 'groq' })
-      }
+      return NextResponse.json({ hint: text, provider: 'groq' })
     }
 
     return NextResponse.json({ error: '담당 선생님이 API 키를 아직 등록하지 않으셨어요.', needsKey: true }, { status: 503 })
