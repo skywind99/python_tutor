@@ -165,11 +165,9 @@ export async function POST(req: NextRequest) {
     const { missionTitle, missionDesc, code, studentMessage, chatHistory = [], errorMsg, userId } = await req.json()
     const userMessage = buildUserMessage(missionTitle, missionDesc, code, studentMessage, chatHistory, errorMsg)
 
-    // 선생님 키 우선, 없으면 서버 환경변수 키 사용
-    const teacherKeys = userId ? await getTeacherKeys(userId) : { geminiKey: null, groqKey: null, teacherId: null }
-    const geminiKey = teacherKeys.geminiKey || process.env.GEMINI_API_KEY || null
-    const groqKey = teacherKeys.groqKey || process.env.GROQ_API_KEY || null
-    const teacherId = teacherKeys.teacherId
+    const { geminiKey, groqKey, teacherId } = userId
+      ? await getTeacherKeys(userId)
+      : { geminiKey: null, groqKey: null, teacherId: null }
 
     // Gemini 우선 (분당 1,500회 — 동시 접속에 강함)
     if (geminiKey) {
