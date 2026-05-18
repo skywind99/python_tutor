@@ -25,6 +25,7 @@ export default function ProblemsPage() {
   const [customMissions, setCustomMissions] = useState<any[]>([])
   const [customLogs, setCustomLogs] = useState<any[]>([])
   const [classesData, setClassesData] = useState<{ id: string; name: string }[]>([])
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string | null>(null)
   const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [movingId, setMovingId] = useState<string | null>(null)
@@ -54,6 +55,7 @@ export default function ProblemsPage() {
       if (!classes?.length) { setLoading(false); return }
       const classIds = classes.map((c: any) => c.id)
       setClassesData(classes)
+      if (classes.length > 0) setSelectedClassFilter(classes[0].id)
 
       const { data: studs } = await sb.from('profiles').select('id, name, class_id').in('class_id', classIds).eq('role', 'student')
       setStudents(studs || [])
@@ -464,19 +466,47 @@ export default function ProblemsPage() {
                     return next
                   })
 
+                  const visibleClasses = selectedClassFilter
+                    ? classesData.filter(c => c.id === selectedClassFilter)
+                    : classesData
+                  const visibleAttempted = attempted.filter(s => {
+                    const st = students.find(st => st.id === s.student_id)
+                    return !selectedClassFilter || st?.class_id === selectedClassFilter
+                  })
+                  const visibleAllExpanded = visibleAttempted.length > 0 && visibleAttempted.every(s => expandedStudents.has(s.student_id))
+
                   return (
                     <>
-                      {attempted.length > 0 && (
-                        <div className="px-5 py-2.5 border-b border-gray-100 flex justify-end">
+                      {/* 반 선택 탭 */}
+                      {classesData.length > 1 && (
+                        <div className="px-5 py-2.5 border-b border-gray-100 flex gap-2 overflow-x-auto">
+                          {classesData.map(cls => {
+                            const clsStudents = students.filter(s => s.class_id === cls.id)
+                            const passed = clsStudents.filter(s => solMap[s.id]?.passed).length
+                            return (
+                              <button key={cls.id} onClick={() => { setSelectedClassFilter(cls.id); setExpandedStudents(new Set()) }}
+                                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                                  selectedClassFilter === cls.id ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                }`}
+                                style={selectedClassFilter === cls.id ? { background: '#4338CA' } : {}}>
+                                {cls.name}
+                                <span className="ml-1 opacity-60">통과 {passed}/{clsStudents.length}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {visibleAttempted.length > 0 && (
+                        <div className="px-5 py-2 border-b border-gray-100 flex justify-end">
                           <button
-                            onClick={() => setExpandedStudents(allExpanded ? new Set() : new Set(attempted.map(s => s.student_id)))}
+                            onClick={() => setExpandedStudents(visibleAllExpanded ? new Set() : new Set(visibleAttempted.map(s => s.student_id)))}
                             className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-                            style={{ background: allExpanded ? '#f3f4f6' : '#4338CA', color: allExpanded ? '#6b7280' : 'white' }}>
-                            {allExpanded ? '전체 닫기' : '전체 코드 보기'}
+                            style={{ background: visibleAllExpanded ? '#f3f4f6' : '#4338CA', color: visibleAllExpanded ? '#6b7280' : 'white' }}>
+                            {visibleAllExpanded ? '전체 닫기' : '전체 코드 보기'}
                           </button>
                         </div>
                       )}
-                      {classesData.map(cls => {
+                      {visibleClasses.map(cls => {
                         const clsStudents = students.filter(s => s.class_id === cls.id)
                         if (clsStudents.length === 0) return null
                         const passedCount = clsStudents.filter(s => solMap[s.id]?.passed).length
@@ -634,19 +664,47 @@ export default function ProblemsPage() {
                   return next
                 })
 
+                const visibleClasses = selectedClassFilter
+                  ? classesData.filter(c => c.id === selectedClassFilter)
+                  : classesData
+                const visibleSolvers = solvers.filter((s: any) => {
+                  const st = students.find(st => st.id === s.student_id)
+                  return !selectedClassFilter || st?.class_id === selectedClassFilter
+                })
+                const visibleAllExpanded = visibleSolvers.length > 0 && visibleSolvers.every((s: any) => expandedStudents.has(s.student_id))
+
                 return (
                   <>
-                    {solvers.length > 0 && (
-                      <div className="px-5 py-2.5 border-b border-gray-100 flex justify-end">
+                    {/* 반 선택 탭 */}
+                    {classesData.length > 1 && (
+                      <div className="px-5 py-2.5 border-b border-gray-100 flex gap-2 overflow-x-auto">
+                        {classesData.map(cls => {
+                          const clsStudents = students.filter(s => s.class_id === cls.id)
+                          const done = clsStudents.filter(s => solMap[s.id]).length
+                          return (
+                            <button key={cls.id} onClick={() => { setSelectedClassFilter(cls.id); setExpandedStudents(new Set()) }}
+                              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                                selectedClassFilter === cls.id ? 'text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                              }`}
+                              style={selectedClassFilter === cls.id ? { background: '#4338CA' } : {}}>
+                              {cls.name}
+                              <span className="ml-1 opacity-60">완료 {done}/{clsStudents.length}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {visibleSolvers.length > 0 && (
+                      <div className="px-5 py-2 border-b border-gray-100 flex justify-end">
                         <button
-                          onClick={() => setExpandedStudents(allExpanded ? new Set() : new Set(solvers.map((s: any) => s.student_id)))}
+                          onClick={() => setExpandedStudents(visibleAllExpanded ? new Set() : new Set(visibleSolvers.map((s: any) => s.student_id)))}
                           className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-                          style={{ background: allExpanded ? '#f3f4f6' : '#4338CA', color: allExpanded ? '#6b7280' : 'white' }}>
-                          {allExpanded ? '전체 닫기' : '전체 코드 보기'}
+                          style={{ background: visibleAllExpanded ? '#f3f4f6' : '#4338CA', color: visibleAllExpanded ? '#6b7280' : 'white' }}>
+                          {visibleAllExpanded ? '전체 닫기' : '전체 코드 보기'}
                         </button>
                       </div>
                     )}
-                    {classesData.map(cls => {
+                    {visibleClasses.map(cls => {
                       const clsStudents = students.filter(s => s.class_id === cls.id)
                       if (clsStudents.length === 0) return null
                       const completedCount = clsStudents.filter(s => solMap[s.id]).length
