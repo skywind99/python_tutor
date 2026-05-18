@@ -25,11 +25,14 @@ export default function ProblemsPage() {
   const [customMissions, setCustomMissions] = useState<any[]>([])
   const [customLogs, setCustomLogs] = useState<any[]>([])
   const [classesData, setClassesData] = useState<{ id: string; name: string }[]>([])
+  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [movingId, setMovingId] = useState<string | null>(null)
   const [editingMission, setEditingMission] = useState<any | null>(null)
   const [editForm, setEditForm] = useState({ title: '', topic: '', description: '', expectedOutput: '', level: 2 })
   const [savingEdit, setSavingEdit] = useState(false)
+
+  useEffect(() => { setExpandedStudents(new Set()) }, [selectedMission?.id, selectedCustomMission?.id])
 
   const loadCustomMissions = useCallback(async () => {
     const res = await fetch('/api/custom-missions')
@@ -450,67 +453,102 @@ export default function ProblemsPage() {
               <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
                 {(() => {
                   const solutions = getStudentSolutions(selectedMission.id)
-                  const solvedIds = new Set(solutions.map(s => s.student_id))
-                  if (solutions.length === 0 && students.length === 0) return (
-                    <div className="p-10 text-center text-gray-400">
-                      <div className="text-4xl mb-3">📝</div>
-                      <p className="text-sm">아직 이 문제를 시도한 학생이 없어요</p>
-                    </div>
-                  )
-                  return classesData.map(cls => {
-                    const clsStudents = students.filter(s => s.class_id === cls.id)
-                    const clsSolutions = solutions.filter(s => s.classId === cls.id).sort((a, b) => b.score - a.score)
-                    const unsolved = clsStudents.filter(s => !solvedIds.has(s.id))
-                    if (clsStudents.length === 0) return null
-                    return (
-                      <div key={cls.id}>
-                        <div className="px-5 py-2.5 bg-gray-50 border-y border-gray-100 flex items-center justify-between sticky top-0 z-10">
-                          <span className="text-xs font-bold text-gray-600">{cls.name}</span>
-                          <span className="text-xs text-gray-400">
-                            시도 {clsSolutions.length}명 · 통과 {clsSolutions.filter(s => s.passed).length}명 · 미시도 {unsolved.length}명
-                          </span>
-                        </div>
-                        <div className="divide-y divide-gray-50">
-                          {clsSolutions.map((sol, i) => (
-                            <div key={i} className="p-5">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ background: '#4338CA' }}>
-                                    {sol.studentName?.[0] || '?'}
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                                        sol.passed ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-400'
-                                      }`}>{sol.passed ? '✓ 통과' : '미통과'}</span>
-                                      <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
-                                      <span className="text-xs text-gray-400">시도 {sol.attempts}회</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-sm font-bold text-gray-900">{sol.score}점</div>
-                              </div>
-                              {sol.code && (
-                                <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
-                                  <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                          {unsolved.length > 0 && (
-                            <div className="px-5 py-3 flex flex-wrap gap-1.5 items-center">
-                              <span className="text-xs text-gray-400 mr-1">미시도:</span>
-                              {unsolved.map(s => (
-                                <span key={s.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">{s.name}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
+                  const solMap: Record<string, any> = {}
+                  solutions.forEach(s => { solMap[s.student_id] = s })
+                  const attempted = solutions.filter(s => s.code)
+                  const allExpanded = attempted.length > 0 && attempted.every(s => expandedStudents.has(s.student_id))
+
+                  const toggleStudent = (id: string) => setExpandedStudents(prev => {
+                    const next = new Set(prev)
+                    next.has(id) ? next.delete(id) : next.add(id)
+                    return next
                   })
+
+                  return (
+                    <>
+                      {attempted.length > 0 && (
+                        <div className="px-5 py-2.5 border-b border-gray-100 flex justify-end">
+                          <button
+                            onClick={() => setExpandedStudents(allExpanded ? new Set() : new Set(attempted.map(s => s.student_id)))}
+                            className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                            style={{ background: allExpanded ? '#f3f4f6' : '#4338CA', color: allExpanded ? '#6b7280' : 'white' }}>
+                            {allExpanded ? '전체 닫기' : '전체 코드 보기'}
+                          </button>
+                        </div>
+                      )}
+                      {classesData.map(cls => {
+                        const clsStudents = students.filter(s => s.class_id === cls.id)
+                        if (clsStudents.length === 0) return null
+                        const passedCount = clsStudents.filter(s => solMap[s.id]?.passed).length
+                        const attemptedCount = clsStudents.filter(s => solMap[s.id]).length
+                        const notAttempted = clsStudents.filter(s => !solMap[s.id])
+                        return (
+                          <div key={cls.id}>
+                            <div className="px-5 py-2.5 bg-gray-50 border-y border-gray-100 flex items-center justify-between sticky top-0 z-10">
+                              <span className="text-xs font-bold text-gray-600">{cls.name}</span>
+                              <span className="text-xs text-gray-400">
+                                <span className="text-teal-600 font-semibold">통과 {passedCount}</span>
+                                {' · '}미통과 {attemptedCount - passedCount}
+                                {' · '}미시도 {notAttempted.length}
+                              </span>
+                            </div>
+                            <div className="divide-y divide-gray-50">
+                              {clsStudents.map(student => {
+                                const sol = solMap[student.id]
+                                const isExpanded = expandedStudents.has(student.id)
+                                if (!sol) {
+                                  return (
+                                    <div key={student.id} className="px-5 py-3 flex items-center gap-3">
+                                      <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-300 flex-shrink-0">
+                                        {student.name[0]}
+                                      </div>
+                                      <span className="text-sm text-gray-300">{student.name}</span>
+                                      <span className="text-xs text-gray-200 ml-auto">미시도</span>
+                                    </div>
+                                  )
+                                }
+                                return (
+                                  <div key={student.id}>
+                                    <button
+                                      onClick={() => toggleStudent(student.id)}
+                                      className="w-full px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left">
+                                      <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                        style={{ background: sol.passed ? '#0d9488' : '#9ca3af' }}>
+                                        {sol.studentName[0]}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className={`text-sm font-semibold ${sol.passed ? 'text-gray-900' : 'text-gray-500'}`}>
+                                          {sol.studentName}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                          <span className={`text-xs font-medium ${sol.passed ? 'text-teal-600' : 'text-gray-400'}`}>
+                                            {sol.passed ? '✓ 통과' : '✗ 미통과'}
+                                          </span>
+                                          <span className="text-xs text-gray-300">힌트 {sol.hints_used}개</span>
+                                          <span className="text-xs text-gray-300">시도 {sol.attempts}회</span>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 flex-shrink-0">
+                                        <span className="text-sm font-bold text-gray-700">{sol.score}점</span>
+                                        <span className="text-xs text-gray-300">{isExpanded ? '▲' : '▼'}</span>
+                                      </div>
+                                    </button>
+                                    {isExpanded && sol.code && (
+                                      <div className="px-4 pb-3">
+                                        <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
+                                          <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )
                 })()}
               </div>
             )}
@@ -586,62 +624,93 @@ export default function ProblemsPage() {
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
               {(() => {
                 const solvers = getCustomMissionSolvers(selectedCustomMission.id)
-                const solvedIds = new Set(solvers.map((s: any) => s.student_id))
-                return classesData.map(cls => {
-                  const clsStudents = students.filter(s => s.class_id === cls.id)
-                  const clsSolvers = solvers.filter((s: any) => s.classId === cls.id)
-                  const unsolved = clsStudents.filter(s => !solvedIds.has(s.id))
-                  if (clsStudents.length === 0) return null
-                  return (
-                    <div key={cls.id}>
-                      <div className="px-5 py-2.5 bg-gray-50 border-y border-gray-100 flex items-center justify-between sticky top-0 z-10">
-                        <span className="text-xs font-bold text-gray-600">{cls.name}</span>
-                        <span className="text-xs text-gray-400">
-                          완료 {clsSolvers.length}명 · 미완료 {unsolved.length}명
-                        </span>
-                      </div>
-                      {clsSolvers.length === 0 ? (
-                        <div className="px-5 py-4 text-xs text-gray-300">완료한 학생 없음</div>
-                      ) : (
-                        <div className="divide-y divide-gray-50">
-                          {clsSolvers.map((sol: any, i: number) => (
-                            <div key={i} className="p-5">
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ background: '#4338CA' }}>
-                                    {sol.studentName?.[0] || '?'}
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-teal-50 text-teal-600">✓ 완료</span>
-                                      <span className="text-xs text-gray-400">힌트 {sol.hints_used}개</span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-sm font-bold text-gray-900">{sol.score}점</div>
-                              </div>
-                              {sol.code && (
-                                <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
-                                  <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {unsolved.length > 0 && (
-                        <div className="px-5 py-3 flex flex-wrap gap-1.5 items-center border-t border-gray-50">
-                          <span className="text-xs text-gray-400 mr-1">미완료:</span>
-                          {unsolved.map((s: any) => (
-                            <span key={s.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">{s.name}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
+                const solMap: Record<string, any> = {}
+                solvers.forEach((s: any) => { solMap[s.student_id] = s })
+                const allExpanded = solvers.length > 0 && solvers.every((s: any) => expandedStudents.has(s.student_id))
+
+                const toggleStudent = (id: string) => setExpandedStudents(prev => {
+                  const next = new Set(prev)
+                  next.has(id) ? next.delete(id) : next.add(id)
+                  return next
                 })
+
+                return (
+                  <>
+                    {solvers.length > 0 && (
+                      <div className="px-5 py-2.5 border-b border-gray-100 flex justify-end">
+                        <button
+                          onClick={() => setExpandedStudents(allExpanded ? new Set() : new Set(solvers.map((s: any) => s.student_id)))}
+                          className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                          style={{ background: allExpanded ? '#f3f4f6' : '#4338CA', color: allExpanded ? '#6b7280' : 'white' }}>
+                          {allExpanded ? '전체 닫기' : '전체 코드 보기'}
+                        </button>
+                      </div>
+                    )}
+                    {classesData.map(cls => {
+                      const clsStudents = students.filter(s => s.class_id === cls.id)
+                      if (clsStudents.length === 0) return null
+                      const completedCount = clsStudents.filter(s => solMap[s.id]).length
+                      return (
+                        <div key={cls.id}>
+                          <div className="px-5 py-2.5 bg-gray-50 border-y border-gray-100 flex items-center justify-between sticky top-0 z-10">
+                            <span className="text-xs font-bold text-gray-600">{cls.name}</span>
+                            <span className="text-xs text-gray-400">
+                              <span className="text-teal-600 font-semibold">완료 {completedCount}</span>
+                              {' · '}미완료 {clsStudents.length - completedCount}
+                            </span>
+                          </div>
+                          <div className="divide-y divide-gray-50">
+                            {clsStudents.map(student => {
+                              const sol = solMap[student.id]
+                              const isExpanded = expandedStudents.has(student.id)
+                              if (!sol) {
+                                return (
+                                  <div key={student.id} className="px-5 py-3 flex items-center gap-3">
+                                    <div className="w-7 h-7 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-300 flex-shrink-0">
+                                      {student.name[0]}
+                                    </div>
+                                    <span className="text-sm text-gray-300">{student.name}</span>
+                                    <span className="text-xs text-gray-200 ml-auto">미완료</span>
+                                  </div>
+                                )
+                              }
+                              return (
+                                <div key={student.id}>
+                                  <button
+                                    onClick={() => toggleStudent(student.id)}
+                                    className="w-full px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left">
+                                    <div className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                      style={{ background: '#0d9488' }}>
+                                      {sol.studentName[0]}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-semibold text-gray-900">{sol.studentName}</div>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs font-medium text-teal-600">✓ 완료</span>
+                                        <span className="text-xs text-gray-300">힌트 {sol.hints_used}개</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <span className="text-sm font-bold text-gray-700">{sol.score}점</span>
+                                      <span className="text-xs text-gray-300">{isExpanded ? '▲' : '▼'}</span>
+                                    </div>
+                                  </button>
+                                  {isExpanded && sol.code && (
+                                    <div className="px-4 pb-3">
+                                      <div className="bg-gray-950 rounded-xl p-3 overflow-x-auto">
+                                        <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{sol.code}</pre>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )
               })()}
             </div>
           </div>
