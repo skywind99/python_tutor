@@ -58,6 +58,8 @@ export default function MissionsPage() {
   const [chatInput, setChatInput] = useState('')
   const [hintCount, setHintCount] = useState(0)
   const [hintLoading, setHintLoading] = useState(false)
+  const [hintCooldown, setHintCooldown] = useState(0)
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const [running, setRunning] = useState(false)
   const [pyReady, setPyReady] = useState(false)
@@ -137,10 +139,16 @@ export default function MissionsPage() {
     loadUserProgress()
   }, [])
 
+  const resetChat = () => {
+    setChatMessages([]); setChatInput(''); setHintCount(0)
+    setHintCooldown(0)
+    if (cooldownRef.current) clearInterval(cooldownRef.current)
+  }
+
   const changeMission = (m: Mission) => {
     setCurrentCustom(null)
     setCurrent(m); setCode(m.template); setOutput(''); setOutputOk(null)
-    setDiffMsg(''); setTestResults([]); setChatMessages([]); setChatInput(''); setHintCount(0)
+    setDiffMsg(''); setTestResults([]); resetChat()
     setSolutionCode(''); setShowSolution(false)
   }
 
@@ -149,7 +157,7 @@ export default function MissionsPage() {
     setCode(m.template || '')
     setOutput(''); setOutputOk(null)
     setDiffMsg(''); setTestResults([])
-    setChatMessages([]); setChatInput(''); setHintCount(0)
+    resetChat()
     setSolutionCode(''); setShowSolution(false)
   }
 
@@ -344,8 +352,21 @@ export default function MissionsPage() {
     setTimeout(() => setCelebration(''), 2500)
   }
 
+  const HINT_COOLDOWN_SEC = 60
+
+  const startCooldown = () => {
+    if (cooldownRef.current) clearInterval(cooldownRef.current)
+    setHintCooldown(HINT_COOLDOWN_SEC)
+    cooldownRef.current = setInterval(() => {
+      setHintCooldown(prev => {
+        if (prev <= 1) { clearInterval(cooldownRef.current!); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
   const sendChat = async (message: string) => {
-    if (hintLoading) return
+    if (hintLoading || hintCooldown > 0) return
     const userMsg = message.trim()
     setHintLoading(true)
     if (userMsg) setChatMessages(prev => [...prev, { role: 'user', text: userMsg }])
@@ -370,6 +391,7 @@ export default function MissionsPage() {
       const reply = data.hint || data.error || '응답을 받지 못했어요.'
       setChatMessages(prev => [...prev, { role: 'ai', text: reply }])
       setHintCount(c => Math.min(c + 1, 5))
+      startCooldown()
     } catch {
       setChatMessages(prev => [...prev, { role: 'ai', text: '힌트를 불러오지 못했어요. 다시 시도해주세요.' }])
     }
@@ -575,29 +597,39 @@ export default function MissionsPage() {
             </div>
 
             {/* 입력창 */}
-            <div className="p-2 flex gap-1.5 flex-shrink-0 items-center" style={{background:'white',borderTop:'1px solid #e5e7eb'}}>
-              <div style={{width:44,height:44,flexShrink:0}}>
-                <DotLottie src="/lottie/animation/Flirting Dog.lottie" loop autoplay />
+            <div className="flex-shrink-0" style={{background:'white',borderTop:'1px solid #e5e7eb'}}>
+              {hintCooldown > 0 && (
+                <div className="px-3 py-1.5 flex items-center gap-2" style={{background:'#fefce8',borderBottom:'1px solid #fef08a'}}>
+                  <div className="flex-1 h-1 rounded-full overflow-hidden" style={{background:'#fde68a'}}>
+                    <div className="h-full rounded-full transition-all duration-1000" style={{width:`${(hintCooldown/HINT_COOLDOWN_SEC)*100}%`,background:'#f59e0b'}}/>
+                  </div>
+                  <span className="text-xs font-semibold whitespace-nowrap" style={{color:'#b45309'}}>{hintCooldown}초 후 질문 가능</span>
+                </div>
+              )}
+              <div className="p-2 flex gap-1.5 items-center">
+                <div style={{width:44,height:44,flexShrink:0}}>
+                  <DotLottie src="/lottie/animation/Flirting Dog.lottie" loop autoplay />
+                </div>
+                <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading || hintCooldown > 0}
+                  className="px-2.5 py-2 text-xs rounded-lg border transition-colors disabled:opacity-40 whitespace-nowrap font-medium"
+                  style={{borderColor:'#e5e7eb',color:'#374151'}}>
+                  💡 분석
+                </button>
+                <input
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
+                  placeholder={hintCooldown > 0 ? `${hintCooldown}초 후 질문 가능해요` : '질문하세요...'}
+                  className="flex-1 text-xs border rounded-lg px-3 py-2 outline-none min-w-0"
+                  style={{borderColor:'#e5e7eb'}}
+                  disabled={hintLoading || hintCooldown > 0}
+                />
+                <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || hintCooldown > 0 || !chatInput.trim()}
+                  className="px-3 py-2 text-xs font-semibold text-white rounded-lg transition-colors disabled:opacity-40"
+                  style={{background:'#2563eb'}}>
+                  전송
+                </button>
               </div>
-              <button onClick={() => sendChat('내 코드 분석해줘')} disabled={hintLoading}
-                className="px-2.5 py-2 text-xs rounded-lg border transition-colors disabled:opacity-40 whitespace-nowrap font-medium"
-                style={{borderColor:'#e5e7eb',color:'#374151'}}>
-                💡 분석
-              </button>
-              <input
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && chatInput.trim()) { e.preventDefault(); sendChat(chatInput) } }}
-                placeholder="질문하세요..."
-                className="flex-1 text-xs border rounded-lg px-3 py-2 outline-none min-w-0"
-                style={{borderColor:'#e5e7eb'}}
-                disabled={hintLoading}
-              />
-              <button onClick={() => { if (chatInput.trim()) sendChat(chatInput) }} disabled={hintLoading || !chatInput.trim()}
-                className="px-3 py-2 text-xs font-semibold text-white rounded-lg transition-colors disabled:opacity-40"
-                style={{background:'#2563eb'}}>
-                전송
-              </button>
             </div>
           </div>
         </div>
