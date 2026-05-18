@@ -330,7 +330,7 @@ export default function ProfilePage() {
                         </div>
                         <div>
                           <span className="font-semibold text-orange-300">Groq</span>
-                          <span className="text-white/60"> — 미션 힌트에 사용 · 빠르고 무료 · 하루 약 30회 제한</span>
+                          <span className="text-white/60"> — 미션 힌트에 사용 · 빠르고 무료 · 하루 1,000회 / 100K 토큰 제한</span>
                         </div>
                       </div>
                     </>
