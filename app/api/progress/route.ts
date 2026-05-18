@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 
 export async function POST(req: NextRequest) {
   try {
-    const { missionId, passed, hintsUsed, score, code } = await req.json()
+    const { missionId, passed, hintsUsed, score, code, attempts } = await req.json()
 
     const cookieStore = await cookies()
     const supabase = createServerClient(
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       // 기존 기록보다 점수 높으면 업데이트
-      const updateData: any = { attempts: (existing.attempts || 0) + 1 }
+      const updateData: any = { attempts: attempts != null ? Math.max(attempts, existing.attempts || 0) : (existing.attempts || 0) + 1 }
       if (score > existing.score) {
         updateData.score = score
         updateData.hints_used = hintsUsed

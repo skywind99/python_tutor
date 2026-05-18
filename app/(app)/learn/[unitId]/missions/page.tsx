@@ -112,6 +112,7 @@ export default function MissionsPage() {
   const [currentCustom, setCurrentCustom] = useState<any | null>(null)
   const [passedCustom, setPassedCustom] = useState<Record<string, boolean>>({})
   const gemIdRef = useRef(0)
+  const runCountRef = useRef(0)
 
   const [showSuccessLottie, setShowSuccessLottie] = useState(false)
   const successTypeRef = useRef<'jump'|'confetti'>('confetti')
@@ -180,6 +181,7 @@ export default function MissionsPage() {
     setChatMessages([]); setChatInput(''); setHintCount(0)
     setHintCooldown(0)
     if (cooldownRef.current) clearInterval(cooldownRef.current)
+    runCountRef.current = 0
   }
 
   const changeMission = (m: Mission) => {
@@ -239,14 +241,38 @@ export default function MissionsPage() {
           code,
           score: s,
           hints_used: hintCount,
+          attempts: runCountRef.current,
         }, { onConflict: 'custom_mission_id,student_id' })
       } catch (e) { console.error('Custom save failed:', e) }
       setPassedCustom(p => ({ ...p, [String(currentCustom.id)]: true }))
     }
+
+    setScore(prev => prev + s)
+    setXp(prev => { const nx = prev + Math.floor(s/3); if(nx>=1000){setLevel(l=>l+1);return nx-1000} return nx })
+    setScorePopup({ text: `+${s}` })
+    setTimeout(() => setScorePopup(null), 1500)
+
     successTypeRef.current = successTypeRef.current === 'jump' ? 'confetti' : 'jump'
     setShowSuccessLottie(true)
     setTimeout(() => setShowSuccessLottie(false), 3500)
-    setCelebration('🎉 추가문제 완료!')
+
+    const gemN = (LEVEL_INFO[currentCustom.level as 1|2|3]?.gemCount ?? 3) + (hintCount === 0 ? 3 : 0)
+    for (let i = 0; i < gemN; i++) {
+      setTimeout(() => {
+        const type = GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)]
+        const id = ++gemIdRef.current
+        setGems(g => [...g, { id, type, x: 10 + Math.random() * 80 }])
+        setTimeout(() => {
+          setGems(g => g.filter(gem => gem.id !== id))
+          setPile(p => [...p, type].slice(-60))
+        }, 900)
+      }, i * 80)
+    }
+
+    const msgs = hintCount === 0
+      ? ['🔥 혼자 해냈어! 대단한걸?', '⚡ 힌트 없이 완벽!']
+      : ['✨ 추가문제 클리어!', '🎯 잘했어! 다음 문제도 도전해봐!']
+    setCelebration(msgs[Math.floor(Math.random() * msgs.length)])
     setTimeout(() => setCelebration(''), 2500)
   }
 
@@ -255,6 +281,7 @@ export default function MissionsPage() {
     setRunning(true)
     setIsRuntimeError(false)
     setDiffMsg('')
+    runCountRef.current += 1
     const Sk = window.Sk
 
     if (currentCustom) {
@@ -362,7 +389,7 @@ export default function MissionsPage() {
       await fetch('/api/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ missionId: current.id, passed: true, hintsUsed: hintCount, score: s, code })
+        body: JSON.stringify({ missionId: current.id, passed: true, hintsUsed: hintCount, score: s, code, attempts: runCountRef.current })
       })
     } catch (e) { console.error('Save failed:', e) }
 
