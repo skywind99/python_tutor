@@ -15,15 +15,23 @@ export async function POST(req: NextRequest) {
 
     const sb = getAdminClient()
     const { data: prof } = await sb.from('profiles')
-      .select('groq_key, groq_remaining_requests, groq_limit_requests, groq_remaining_tokens, groq_limit_tokens, groq_quota_updated_at')
+      .select('groq_key, groq_remaining_requests, groq_limit_requests, groq_remaining_tokens, groq_limit_tokens, groq_quota_updated_at, gemini_key, gemini_requests_today, gemini_tokens_today, gemini_usage_date, gemini_quota_updated_at')
       .eq('id', userId)
       .single()
 
-    if (!prof?.groq_key) {
-      return NextResponse.json({ error: 'Groq 키가 등록되지 않았어요.' }, { status: 404 })
+    if (!prof?.groq_key && !prof?.gemini_key) {
+      return NextResponse.json({ error: 'API 키가 등록되지 않았어요.' }, { status: 404 })
     }
 
-    // 저장된 quota가 있으면 바로 반환 (API 소모 없음)
+    const today = new Date().toISOString().split('T')[0]
+    const geminiData = prof.gemini_key ? {
+      requestsToday: prof.gemini_usage_date === today ? (prof.gemini_requests_today || 0) : 0,
+      tokensToday: prof.gemini_usage_date === today ? (prof.gemini_tokens_today || 0) : 0,
+      limitRequests: 1500,
+      updatedAt: prof.gemini_quota_updated_at,
+    } : null
+
+    // Groq 저장된 quota가 있으면 바로 반환 (API 소모 없음)
     if (prof.groq_remaining_requests !== null && prof.groq_remaining_requests !== undefined) {
       return NextResponse.json({
         groq: {
@@ -33,8 +41,14 @@ export async function POST(req: NextRequest) {
           limitTokens: prof.groq_limit_tokens ?? -1,
           updatedAt: prof.groq_quota_updated_at,
         },
+        gemini: geminiData,
         fromCache: true,
       })
+    }
+
+    // Gemini만 있는 경우 (Groq 없음) 바로 반환
+    if (!prof.groq_key && geminiData) {
+      return NextResponse.json({ gemini: geminiData, fromCache: true })
     }
 
     // 저장된 값 없을 때만 실제 API 호출로 초기화
@@ -76,6 +90,7 @@ export async function POST(req: NextRequest) {
         limitTokens: limTok,
         updatedAt: now,
       },
+      gemini: geminiData,
       fromCache: false,
     })
   } catch (err: any) {

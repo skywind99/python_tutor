@@ -310,17 +310,39 @@ export default function ProfilePage() {
                   className="text-xs px-3 py-1.5 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors">
                   Groq →
                 </a>
-                <button onClick={checkQuota} disabled={quotaLoading || !groqSaved}
+                <button onClick={checkQuota} disabled={quotaLoading || (!groqSaved && !geminiSaved)}
                   className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors">
                   {quotaLoading ? '확인 중...' : '🔄 실시간'}
                 </button>
               </div>
             </div>
-            {!groqSaved && (
-              <p className="text-xs text-gray-400">Groq 키를 등록하면 실시간 잔여량을 확인할 수 있어요.</p>
+            {!groqSaved && !geminiSaved && (
+              <p className="text-xs text-gray-400">API 키를 등록하면 실시간 사용량을 확인할 수 있어요.</p>
             )}
             {quota?.error && (
               <p className="text-xs text-red-500">{quota.error}</p>
+            )}
+            {quota?.gemini && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-blue-50 rounded-xl p-3">
+                    <div className="text-xs text-blue-500 mb-1">Gemini 오늘 요청</div>
+                    <div className="text-lg font-bold text-blue-700">{quota.gemini.requestsToday.toLocaleString()}</div>
+                    <div className="text-xs text-blue-400">/ {quota.gemini.limitRequests.toLocaleString()}회</div>
+                    <div className="mt-1 h-1 bg-blue-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-400 rounded-full" style={{width:`${Math.min(100,(quota.gemini.requestsToday/quota.gemini.limitRequests)*100)}%`}}/>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-3">
+                    <div className="text-xs text-blue-500 mb-1">Gemini 오늘 토큰</div>
+                    <div className="text-lg font-bold text-blue-700">{quota.gemini.tokensToday.toLocaleString()}</div>
+                    <div className="text-xs text-blue-400">힌트 1회 ≈ 500토큰</div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">
+                  🕐 학생이 AI 힌트를 쓸 때마다 자동 갱신돼요{quota.gemini.updatedAt ? ` · ${new Date(quota.gemini.updatedAt).toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'})}` : ''}
+                </p>
+              </div>
             )}
             {quota?.groq && (
               <div className="space-y-2">
@@ -347,7 +369,7 @@ export default function ProfilePage() {
                   ))}
                 </div>
                 <p className="text-xs text-gray-400">
-                  {quota.fromCache ? '🕐 학생이 AI 힌트를 쓸 때마다 자동 갱신돼요' : '🔄 초기값 조회 완료'}{quota.groq.updatedAt ? ` · 마지막 갱신: ${new Date(quota.groq.updatedAt).toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'})}` : ''}
+                  {quota.fromCache ? '🕐 학생이 AI 힌트를 쓸 때마다 자동 갱신돼요' : '🔄 초기값 조회 완료'}{quota.groq.updatedAt ? ` · ${new Date(quota.groq.updatedAt).toLocaleString('ko-KR', {month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'})}` : ''}
                 </p>
               </div>
             )}

@@ -24,6 +24,25 @@ async function getTeacherKeys(userId: string): Promise<TeacherKeys> {
   return { geminiKey: null, groqKey: null, teacherId: null }
 }
 
+async function saveGeminiUsage(teacherId: string, totalTokens: number) {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!key) return
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  })
+  const today = new Date().toISOString().split('T')[0]
+  const { data: prof } = await sb.from('profiles')
+    .select('gemini_requests_today, gemini_tokens_today, gemini_usage_date')
+    .eq('id', teacherId).single()
+  const isNewDay = !prof?.gemini_usage_date || prof.gemini_usage_date !== today
+  await sb.from('profiles').update({
+    gemini_requests_today: isNewDay ? 1 : (prof?.gemini_requests_today || 0) + 1,
+    gemini_tokens_today: isNewDay ? totalTokens : (prof?.gemini_tokens_today || 0) + totalTokens,
+    gemini_usage_date: today,
+    gemini_quota_updated_at: new Date().toISOString(),
+  }).eq('id', teacherId)
+}
+
 async function saveGroqQuota(teacherId: string, headers: Headers) {
   const remReq = headers.get('x-ratelimit-remaining-requests')
   const limReq = headers.get('x-ratelimit-limit-requests')
@@ -176,6 +195,8 @@ export async function POST(req: NextRequest) {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite', systemInstruction: SYSTEM_PROMPT })
         const result = await model.generateContent(userMessage)
         const text = result.response.text().trim()
+        const totalTokens = result.response.usageMetadata?.totalTokenCount || 0
+        if (teacherId) saveGeminiUsage(teacherId, totalTokens)
         return NextResponse.json({ hint: text, provider: 'gemini' })
       } catch {
         // Gemini 실패 시 Groq로 fallback
